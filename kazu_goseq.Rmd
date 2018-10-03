@@ -1,0 +1,85 @@
+---
+title: "kazu_goseq"
+output: html_document
+---
+
+```{r}
+library(goseq)
+library(tidyverse)
+library(readxl)
+```
+
+```{r}
+getwd()
+DEgene.1h <- read.csv("DEgenes.Col.1h.csv")
+head(DEgene.1h)
+DEgene.49h <- read.csv("DEgenes.Col.49h.csv")
+genes.shade1h.up <- DEgene.1h %>% filter(logFC>0)
+genes.shade1h.down <- DEgene.1h %>% filter(logFC<0)
+```
+read cpm file
+```{r}
+mycpm.1h <- read.csv("DEgenecpm.1h.csv")
+mycpm.1h
+```
+
+read description
+
+```{r}
+Description <- read.delim("reference/gene_aliases_20180702.txt")
+#Description %>% group_by(name) %>% mutate(description = paste(symbol, sep= ";"))
+Description.merge <- aggregate(Description[,2], list(Description[,1]), function(x) paste0(unique(x),collapse = ";"))
+colnames(Description.merge) <- c("ID", "name")
+
+```
+add description to cpm data
+
+```{r}
+#mycpm.1h.des <- mycpm.1h
+#mycpm.1h.des[,1] <- gsub("\\.\\d", "", mycpm.1h.des$X)
+#mycpm.1h.des <- left_join(mycpm.1h.des, Description.merge, by=c("X"="ID"))
+#mycpm.1h.des <- mycpm.1h.des %>% unite(AGI_desc,c("X","name"))
+```
+
+plot
+
+```{r}
+#genes.shade1h.up[,1] <- gsub("\\.\\d", "", genes.shade1h.up$X)
+genes.shade1h.up %>% left_join(mycpm.1h,by="X") %>% dplyr::select(1, starts_with("Col")) -> plot.data1 
+# plot: use labeller = label_wrap_gen(width=10) for multiple line in each gene name
+plot.data1[,1] <- gsub("\\.\\d", "",plot.data1$X)
+plot.data1 <- plot.data1 %>% left_join(Description.merge, by=c("X"="ID")) %>%  unite(AGI_desc,c("X","name"))
+p1<-plot.data1 %>% gather(sample,value,-1) %>% separate(sample,c("genotype","time_hr","trt","rep"),sep="_") %>%
+ggplot(aes(x=trt,y=value,color=trt,shape=time_hr))  + geom_boxplot() + geom_jitter() + facet_wrap(~AGI_desc,scale="free",labeller = label_wrap_gen(width=30),ncol=3)+theme(strip.text = element_text(size=6))
+p1
+ggsave(p1, file = "shade1h.up.Col.pdf", height = 20, units = "in")
+```
+
+```{r}
+genes.shade1h.down %>% left_join(mycpm.1h,by="X") %>% dplyr::select(1, starts_with("Col")) -> plot.data 
+# plot: use labeller = label_wrap_gen(width=10) for multiple line in each gene name
+plot.data[,1] <- gsub("\\.\\d", "",plot.data$X)
+plot.data <- plot.data %>% left_join(Description.merge, by=c("X"="ID")) %>%  unite(AGI_desc,c("X","name"))
+p<-plot.data %>% gather(sample,value,-1) %>% separate(sample,c("genotype","time_hr","trt","rep"),sep="_") %>%
+ggplot(aes(x=trt,y=value,color=trt,shape=time_hr))  + geom_boxplot() + geom_jitter() + facet_wrap(~AGI_desc,scale="free",labeller = label_wrap_gen(width=30),ncol=3)+theme(strip.text = element_text(size=6))
+p
+ggsave(p, file = "shade1h.down.Col.pdf", height = 20, units = "in")
+```
+
+```{r}
+# GOseq
+library(ShortRead);library(goseq);library(GO.db);library("annotate")
+# Download cDNA sequence file from [Araport11] (https://www.arabidopsis.org/download_files/Sequences/Araport11_blastsets/Araport11_genes.201606.cdna.fasta.gz)
+# At_cdna<-Biostrings::readDNAStringSet("2018-09-26-over-representation-analysis-1-goseq-with-arabidopsis-go-term_files/Araport11_genes.201606.cdna.fasta")
+# donot use Araport11 version due to multiple splicing variants 
+# select only representative splicing variant
+# Download cDNA sequence file (representative) from [TAIR10](https://www.arabidopsis.org/download_files/Sequences/TAIR10_blastsets/TAIR10_cdna_20110103_representative_gene_model_updated)
+#system("gunzip -c kazu_files/knozue-sasphenotyping-b04217e6559b/SAS_analysis_Jan2014/R_scripts_data_objects/TAIR10_cdna_20110103_representative_gene_model.gz > kazu_files/knozue-sasphenotyping-b04217e6559b/SAS_analysis_Jan2014/R_scripts_data_objects/TAIR10_cdna_20110103_representative_gene_model")
+At_cdna<-Biostrings::readDNAStringSet("kazu_files/knozue-sasphenotyping-b04217e6559b/SAS_analysis_Jan2014/R_scripts_data_objects/TAIR10_cdna_20110103_representative_gene_model") 
+At_cdna
+```
+
+```{r}
+
+```
+
