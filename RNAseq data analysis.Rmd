@@ -365,7 +365,7 @@ rownames(DEgene.Col.1h) <- NULL
 DEgene.Col.1h <- column_to_rownames(DEgene.Col.1h, var = "genes")
 #save to a file
 getwd()
-write.csv(DEgene.Col.1h,"DEgenes.Col.1h.csv")
+write.csv(DEgene.Col.1h,"../output/DEgenes.Col.1h.csv")
 ```
 
 #plot genes differentially expressed at 1h shade treatment.
