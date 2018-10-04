@@ -4,7 +4,11 @@ output: html_document
 ---
 
 ```{r}
-#test regular expression
+getwd()
+```
+
+```{r}
+#test regular expression for just keeping the genotype, treatment and timepoint information
 stringtest <- "CL_sid_49h_H_R3_S189_trimmed.fq.gz_output"
 gsub("_S\\d\\d\\d_trimmed.fq.gz_output", "", stringtest)
 #test to see how abundance.tsv look like
@@ -14,14 +18,15 @@ test1 $ sample_id <- "CL_sid_49h_H_R3"
 head(test1)
 ```
 
-add sample_id to each tsv file
+#read files in different fold and add sample_id to each tsv file
 ```{r}
 common_path <- "~/RNAseq/map_output2/"
 dir_list <-list.files("~/RNAseq/map_output2/") 
 dir_list
 
-total_abundance <- data.frame(matrix(ncol = ncol(test1), nrow=0))
-colnames(total_abundance) <- colnames(test1)
+total_abundance <- data.frame(matrix(ncol = ncol(test1), nrow=0)) 
+colnames(total_abundance) <- colnames(test1) #make a emptry data.frame with column names
+
 for (i in dir_list){
   temp_data <- read.table(file = paste(common_path, i, "/abundance.tsv", sep = ""), header = T)
  
@@ -34,7 +39,7 @@ for (i in dir_list){
 }
 
 head(total_abundance)
-total_abundance$sample_id <- gsub("CL_", "", total_abundance$sample_id)
+total_abundance$sample_id <- gsub("CL_", "", total_abundance$sample_id)# remove the "CL_" initial
 head(total_abundance)
 ```
 
@@ -47,7 +52,7 @@ counts.data <- dplyr::select(total_abundance, c(1,4,6))
 colnames(counts.data)[2] <- "counts"
 head(counts.data)
 summary(counts.data)
-#plot histgram
+#plot histgram for the counts
 
 #write a function below
 #counts.Col <- counts.data[grep("Col", counts.data$sample_id), ]
@@ -68,22 +73,25 @@ hist.genotype(counts.data, "npr")
 ```
 
 
-spread counts.data for pairs
+#spread counts.data to make matrix for the following analysis
 
 ```{r}
 counts.data.spread <- counts.data %>% 
   spread(key=sample_id, value= counts)
 
 head(counts.data.spread)
+#save counts.data.spread 
+
+write.csv(counts.data.spread, file = "../output/total_counts_data.csv")
 
 # retain the genes with >10 reads in 3 samples
-# currently don't quite understand
+# currently don't quite understand, but after removing these genes, the MDS plot looks better
 counts.data.spread <- counts.data.spread[rowSums(counts.data.spread[,-1] > 10) >= 3,]
 
 head(counts.data.spread)
 ```
 
-test for first 1000 genes
+#test first 1000 genes for pairs and cor
 
 ```{r}
 counts.data.1000 <- head(counts.data.spread[,-1],n=1000)
@@ -91,15 +99,17 @@ head(counts.data.1000)
 #image is too large to plot 64 samples, try 1000genes in Col first 
 p <- pairs(counts.data.1000[ ,grep("Col", colnames(counts.data.1000))], log="xy")
 p
-ggsave("plot_pair_sid_full.png",path=paste(getwd(),"/figures", sep = ""),pairs(counts.data.spread[ ,grep("sid", colnames(counts.data.spread))], log="xy"),width=20, height=20, units = "cm")
+
+#it's too large to show in the plot window, save first
+ggsave("plot_pair_sid_full.png",path=paste(getwd(),"../figures", sep = ""),pairs(counts.data.spread[ ,grep("sid", colnames(counts.data.spread))], log="xy"),width=20, height=20, units = "cm")
 
 cor(counts.data.spread[,6:9])
 ```
 
-assign groups
+#assign groups
 
 ```{r}
-sample.description <- tibble(sample= colnames(counts.data.spread)[-1])
+sample.description <- tibble(sample= colnames(counts.data.spread)[-1]) # first column is the row name
 head(sample.description)
 library(stringr)
 sample.description <- sample.description %>% 
@@ -129,13 +139,12 @@ sample.description <- sample.description %>%
 sample.description
 ```
 
-calculate normalization factor
+#creat dge.data and calulate normalization factors
 
 ```{r}
 library(edgeR)
 counts.matrix <- counts.data.spread %>% dplyr::select(-target_id) %>% as.matrix()
 rownames(counts.matrix) <- counts.data.spread$target_id
-#colnames(counts.matrix) <- gsub("CL_", "", colnames(counts.matrix))
 dge.data <- DGEList(counts=counts.matrix, 
                     samples = sample.description,
                     genes = counts.data.spread$target_id,
@@ -144,14 +153,14 @@ dim(dge.data)
 dge.data <- calcNormFactors(dge.data, method = "TMM")
 dge.data$samples # look at the normalization factors
 ```
-make normalization factor plot
+#make normalization factor plot
 
 ```{r}
 
 ggplot(dge.data$samples,aes(x=sample,y=norm.factors,fill=trt)) + geom_col() + 
   theme(axis.text.x  = element_text(angle=90, vjust=0.5,size = 7))
 ```
-Col MDS plot only
+#Col MDS plot only
 
 ```{r}
 #subset genotype
@@ -165,7 +174,7 @@ mds.Col.pl %>% ggplot(aes(x=V1,y=V2, shape=tp, color=trt)) + geom_point(size=3) 
 ```
 
 
-myc234 MDS plot only
+#myc234 MDS plot only
 
 ```{r}
 #subset genotype
@@ -178,7 +187,7 @@ mds.myc234.pl <- as_tibble(mds.myc234$cmdscale.out) %>%
 mds.myc234.pl %>% ggplot(aes(x=V1,y=V2, shape=tp, color=trt)) + geom_point(size=3) + ggtitle("myc234 Samples DIM 1 vs 2")+facet_wrap(~tp)
 ```
 
-npr MDS plot only
+#npr MDS plot only
 
 ```{r}
 #subset genotype
@@ -192,7 +201,7 @@ mds.npr.pl %>% ggplot(aes(x=V1,y=V2, shape=tp, color=trt)) + geom_point(size=3) 
 ```
 
 
-sid MDS plot only
+#sid MDS plot only
 
 ```{r}
 #subset genotype
@@ -205,12 +214,7 @@ mds.sid.pl <- as_tibble(mds.sid$cmdscale.out) %>%
 mds.sid.pl %>% ggplot(aes(x=V1,y=V2, shape=tp, color=trt)) + geom_point(size=3) + ggtitle("sid Samples DIM 1 vs 2")+facet_wrap(~tp)
 ```
 
-
-Make a plot of the Biological Coefficient of Variation of each sample
-```{r}
-plotMDS(dge.data, method = "bcv")
-```
-Do MDS for all data and facet by gt~tp
+#Do MDS for all data and facet by gt~tp
 ```{r}
 mds.all <- plotMDS(dge.data, method = "bcv", labels=dge.data$samples$group,gene.selection = "pairwise",dim.plot = c(1,2),ndim=3,plot=FALSE)
 mds.all$cmdscale.out
@@ -221,17 +225,19 @@ mds.all.pl <- as_tibble(mds.all$cmdscale.out) %>%
 
 mds.all.pl %>% ggplot(aes(x=V1,y=V2, color= trt)) + geom_point(size=3) + ggtitle("all Samples DIM 1 vs 2") + facet_grid(gt~tp)
 ```
-extract normalized data
+
+#extract normalized data
 ```{r}
 counts.data.normal <- cpm(dge.data)
 head(counts.data.normal, n =6)
 ```
-before normalization
+
+#before normalization
 ```{r}
 
 boxplot(log2(counts.data.spread[,-1]+1))
 ```
-boxplot for counts after normalization
+#boxplot for counts after normalization
 ```{r}
 boxplot(log2(counts.data.normal+1))
 ```
@@ -242,7 +248,7 @@ boxplot(log2(counts.data.normal+1))
 
 
 
-plot genes
+#plot genes function: plotDE
 
 ```{r}
 library(reshape2)
@@ -253,7 +259,7 @@ plotDE <- function(genes, dge, sample.description) {
   tmp.data <- merge(tmp.data,sample.description,by.x="row.names",by.y="sample")
   tmp.data <- melt(tmp.data,value.name="log2_cpm",variable.name="gene")
   pl <- ggplot(tmp.data,aes(x=gt,y=log2_cpm,fill=trt))
-  pl <- pl + facet_grid(gene~ tp)
+  pl <- pl + facet_grid(tp~gene)
   pl <- pl + ylab("log2(cpm)") + xlab("genotype")
   pl <- pl + geom_boxplot()
   pl + theme(axis.text.x  = element_text(angle=45, vjust=1,hjust=1))
@@ -274,11 +280,14 @@ plotDE <- function(genes, dge, sample.description) {
 
 ```
 
-#assign groups Col 1h treatment
+#subset Col 1h treatment
 
 ```{r}
 #subset counts.data.spread
 counts.data.spread.Col.1h <- counts.data.spread %>% dplyr::select(1:9)
+```
+# assign groups 
+```{r}
 sample.description.Col.1h <- tibble(sample=colnames(counts.data.spread.Col.1h)[-1])
 sample.description.Col.1h
 library(stringr)
@@ -309,7 +318,7 @@ sample.description.Col.1h <- sample.description.Col.1h %>%
 sample.description.Col.1h
 ```
 
-calculate normalization factor
+#calculate normalization factor for 1h Col data
 
 ```{r}
 library(edgeR)
@@ -421,7 +430,7 @@ sample.description.Col.49h <- sample.description.Col.49h %>%
 sample.description.Col.49h
 ```
 
-calculate normalization factor
+#calculate normalization factor for Col 49 h
 
 ```{r}
 library(edgeR)
@@ -477,7 +486,7 @@ rownames(DEgene.Col.49h) <- NULL
 DEgene.Col.49h <- column_to_rownames(DEgene.Col.49h, var = "genes")
 #save to a file
 getwd()
-write.csv(DEgene.Col.49h,"DEgenes.Col.49h.csv")
+write.csv(DEgene.Col.49h,"../output/DEgenes.Col.49h.csv")
 ```
 
 #plot genes differentially expressed at 49h shade treatment.
@@ -485,11 +494,124 @@ write.csv(DEgene.Col.49h,"DEgenes.Col.49h.csv")
 ```{r}
 plotDE(rownames(DEgene.Col.49h)[1:3],dge.data.49h.Col,sample.description.Col.49h)
 ```
-
+#save files
 ```{r}
-DEgenecpm.1h <- cpm(dge.data.1h.Col[rownames(DEgene.Col.1h), ])
-write.csv(DEgenecpm.1h, "DEgenecpm.1h.csv")
-DEgenecpm.49h <- cpm(dge.data.49h.Col[rownames(DEgene.Col.49h), ])
-write.csv(DEgenecpm.49h, "DEgenecpm.49h.csv")
+DEgenecpm.Col.1h <- cpm(dge.data.1h.Col[rownames(DEgene.Col.1h), ])
+write.csv(DEgenecpm.Col.1h, "../output/DEgenecpm.1h.csv")
+DEgenecpm.Col.49h <- cpm(dge.data.49h.Col[rownames(DEgene.Col.49h), ])
+write.csv(DEgenecpm.Col.49h, "../output/DEgenecpm.49h.csv")
+cpm.Col.1h <- cpm(dge.data.1h.Col)
+write.csv(cpm.Col.1h, "../output/cpm.Col.1h.csv")
+cpm.Col.49h <- cpm(dge.data.49h.Col)
+write.csv(cpm.Col.49h, "../output/cpm.Col.49h.csv")
+genes.Col.1h <- topTags(Col.1h.lrt,n = Inf)$table
+rownames(genes.Col.1h) <- NULL
+genes.Col.1h <- column_to_rownames(genes.Col.1h, var = "genes")
+write.csv(genes.Col.1h, "../output/genes.Col.1h.csv")
 ```
 
+# subset data at 1h treatment
+```{r}
+#subset counts.data.spread
+
+counts.data.spread.1h <- counts.data.spread[,-1][, str_detect(colnames(counts.data.spread[,-1]), "1h")]
+counts.data.spread.1h$target_id <- counts.data.spread$target_id
+head(counts.data.spread.1h)
+counts.data.spread.1h <- counts.data.spread.1h[, c(33, 1:32)]#shift the last column target_id to the first column
+head(counts.data.spread.1h)
+```
+# assign groups 
+```{r}
+sample.description.1h <- tibble(sample=colnames(counts.data.spread.1h)[-1])
+sample.description.1h
+library(stringr)
+sample.description.1h <- sample.description.1h %>% 
+  #This next line searches for genotypes in the colnames of counts.data.spread and returns anything that matches
+  #In this way we can extract the genotype info.
+  mutate(gt=str_extract(sample,"Col|myc234|npr|sid")) %>%
+  
+  #Now we use the same method to get the treatment
+  mutate(trt=str_extract(sample,"H|L")) %>%
+  #Now for time points
+  mutate(tp=str_extract(sample, "1h")) %>%
+  
+  # paste the trt, gt, tp columns together to give a group identifier
+
+  mutate(group=str_c(gt,trt,tp, sep = "_"))
+
+sample.description.1h
+
+#next convert gt and trt into group variables (factors)
+
+sample.description.1h <- sample.description.1h %>%
+  mutate(gt=factor(gt, levels=c("Col", "myc234", "npr", "sid")), 
+         trt=factor(trt,levels = c("H","L")),
+         tp=as.factor(tp)
+         ) # setting the levels in this way makes "H" the refernce  
+
+sample.description.1h
+```
+
+#calculate normalization factor for 1h data
+
+```{r}
+library(edgeR)
+counts.matrix.1h <- counts.data.spread.1h %>% dplyr::select(-target_id) %>% as.matrix()
+rownames(counts.matrix.1h) <- counts.data.spread.1h$target_id
+dge.data.1h <- DGEList(counts=counts.matrix.1h, 
+                    samples = sample.description.1h,
+                    genes = counts.data.spread.1h$target_id,
+                    group=sample.description.1h$group)
+dim(dge.data.1h) 
+dge.data.1h <- calcNormFactors(dge.data.1h, method = "TMM")
+dge.data.1h$samples # look at the normalization factors
+```
+#design 1h
+```{r}
+design.1h <- model.matrix(~gt*trt,data = sample.description.1h)
+rownames(design.1h) <- sample.description.1h$sample
+design.1h
+```
+
+
+```{r}
+#First the overall dispersion
+dge.data.1h <- estimateGLMCommonDisp(dge.data.1h,design.1h,verbose = TRUE)
+
+#Then a trended dispersion based on count level
+dge.data.1h <- estimateGLMTrendedDisp(dge.data.1h,design.1h)
+
+#And lastly we calculate the gene-wise dispersion, using the prior estimates to "squeeze" the dispersion towards the common dispersion.
+dge.data.1h <- estimateGLMTagwiseDisp(dge.data.1h,design.1h)
+
+#We can examine this with a plot
+plotBCV(dge.data.1h)
+```
+
+
+
+#just for the genes differentially expressed in myc234 gt*trt , 
+```{r}
+fit.1h <- glmFit(dge.data.1h, design.1h)
+myc234.1h.lrt <- glmLRT(fit.1h,coef =6)
+topTags(myc234.1h.lrt) # the top 10 most differentially expressed genes
+summary(decideTestsDGE(myc234.1h.lrt,p.value=0.01)) #This uses the FDR.
+summary(decideTestsDGE(myc234.1h.lrt,p.value=0.05)) #This uses the FDR.  0.05 would be OK also.
+```
+#save the differentially expressed genes at 0.05 in myc234
+
+```{r}
+#Extract genes with a FDR < 0.01 (could also use 0.05)
+DEgene.myc234.1h <- topTags(myc234.1h.lrt,n = Inf,p.value = 0.05)$table
+rownames(DEgene.myc234.1h) <- NULL
+DEgene.myc234.1h <- column_to_rownames(DEgene.myc234.1h, var = "genes")
+#save to a file
+getwd()
+write.csv(DEgene.myc234.1h,"../output/DEgenes.myc234.1h.csv")
+```
+
+#plot genes differentially expressed at 1h shade treatment in myc234.
+
+```{r}
+plotDE(rownames(DEgene.myc234.1h),dge.data.1h,sample.description.1h)
+```
