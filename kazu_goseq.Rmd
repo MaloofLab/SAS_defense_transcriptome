@@ -8,18 +8,27 @@ library(goseq)
 library(tidyverse)
 library(readxl)
 ```
-# read defferencially expressed genes saved in csv file
+
+
+
+#read defferentially expressed genes in different geneotypes, for this part, only consider the shade regulated genes in each genotype, not the interaction
+
+
+
+
+
 ```{r}
+
 getwd()
-DEgene.1h <- read.csv("../output/DEgenes.Col.1h.csv")
+DEgene.1h <- read.csv("../output/DEgenes.npr.1h.sep.csv")
 head(DEgene.1h)
-DEgene.49h <- read.csv("../output/DEgenes.Col.49h.csv")
+DEgene.49h <- read.csv("../output/DEgenes.npr.49h.sep.csv")
 genes.shade1h.up <- DEgene.1h %>% filter(logFC>0)
 genes.shade1h.down <- DEgene.1h %>% filter(logFC<0)
 ```
 #read cpm file for only defferentialy expressed genes at 1h
 ```{r}
-mycpm.1h <- read.csv("../output/DEgenecpm.1h.csv")
+mycpm.1h <- read.csv("../output/cpm.1h.npr.csv")
 mycpm.1h
 ```
 
@@ -34,30 +43,30 @@ colnames(Description.merge) <- c("ID", "name")
 ```
 
 
-#plot genes up and down regulated at 1h in Col
+#plot genes up and down regulated at 1h in npr
 
 ```{r}
 #only leave the gene id and sample_id column
-genes.shade1h.up %>% left_join(mycpm.1h,by="X") %>% dplyr::select(1, starts_with("Col")) -> plot.data1 
+genes.shade1h.up %>% left_join(mycpm.1h,by="X") %>% dplyr::select(1, starts_with("npr")) -> plot.data1 
 #remove the .1 in the gene name
 plot.data1[,1] <- gsub("\\.\\d", "",plot.data1$X)
 #merge gene id with gene name
 plot.data1 <- plot.data1 %>% left_join(Description.merge, by=c("X"="ID")) %>%  unite(AGI_desc,c("X","name"))
-p1<-plot.data1 %>% gather(sample,value,-1) %>% separate(sample,c("genotype","time_hr","trt","rep"),sep="_") %>%
-ggplot(aes(x=trt,y=value,color=trt,shape=time_hr))  + geom_violin() + geom_jitter() + facet_wrap(~AGI_desc,scale="free",labeller = label_wrap_gen(width=30),ncol=3)+theme(strip.text = element_text(size=6))
+p1<-plot.data1[1:30,] %>% gather(sample,value,-1) %>% separate(sample,c("genotype","time_hr","trt","rep"),sep="_") %>%
+ggplot(aes(x=trt,y=value,color=trt,shape=time_hr))  + geom_boxplot() + geom_point()+ facet_wrap(genotype~AGI_desc,scale="free",labeller = label_wrap_gen(width=30),ncol=3)+theme(strip.text = element_text(size=6))+ggtitle("up_regulated_top30_npr_1h_only")
 p1
-ggsave(p1, file = "../output/shade1h.up.Col.pdf", height = 20, units = "in")
+ggsave(p1, file = "../output/shade1h.up30.npr.sep.pdf", height = 20, units = "in")
 ```
 
 ```{r}
-genes.shade1h.down %>% left_join(mycpm.1h,by="X") %>% dplyr::select(1, starts_with("Col")) -> plot.data 
+genes.shade1h.down %>% left_join(mycpm.1h,by="X") %>% dplyr::select(1, starts_with("npr")) -> plot.data 
 # plot: use labeller = label_wrap_gen(width=10) for multiple line in each gene name
 plot.data[,1] <- gsub("\\.\\d", "",plot.data$X)
 plot.data <- plot.data %>% left_join(Description.merge, by=c("X"="ID")) %>%  unite(AGI_desc,c("X","name"))
 p<-plot.data %>% gather(sample,value,-1) %>% separate(sample,c("genotype","time_hr","trt","rep"),sep="_") %>%
-ggplot(aes(x=trt,y=value,color=trt,shape=time_hr))  + geom_violin() + geom_jitter() + facet_wrap(~AGI_desc,scale="free",labeller = label_wrap_gen(width=30),ncol=3)+theme(strip.text = element_text(size=6))
+ggplot(aes(x=trt,y=value,color=trt,shape=time_hr))  + geom_boxplot() + geom_jitter() + facet_wrap(genotype~AGI_desc,scale="free",labeller = label_wrap_gen(width=30),ncol=3)+theme(strip.text = element_text(size=6))+ ggtitle("down_regulated_top30_npr_1h_only")
 p
-ggsave(p, file = "../output/shade1h.down.Col.pdf", height = 20, units = "in")
+ggsave(p, file = "../output/shade1h.down30.npr.sep.pdf", height = 40, units = "in")
 ```
 
 # plot the known up regulated genes at 1h shade treatment from my data
@@ -86,5 +95,161 @@ p3<-plot.data3 %>% gather(sample,value,-1) %>% separate(sample,c("genotype","tim
 ggplot(aes(x=trt,y=value,color=trt,shape=time_hr))  + geom_violin() + geom_jitter() + facet_wrap(~AGI_desc,scale="free",labeller = label_wrap_gen(width=30),ncol=3)+theme(strip.text = element_text(size=6))
 p3
 ggsave(p3, file = "../output/known_shade_up_Col_1h.pdf", height = 20, units = "in")
+```
+
+
+#read differentially expressed genes in myc234 at 1h treatment gt*trt
+
+```{r}
+DEgenes.myc234.1h <- read.csv("../output/DEgenes.myc234.1h.csv")
+cpm.1h <- read.csv("../output/cpm.1h.csv")
+```
+
+#plot genes at 1h in myc234
+
+```{r}
+#only leave the gene id and sample_id column
+DEgenes.myc234.1h %>% left_join(cpm.1h,by="X") %>% dplyr::select(1, contains("1h")) -> plot.data.myc234
+#remove the .1 in the gene name
+plot.data.myc234[,1] <- gsub("\\.\\d", "",plot.data.myc234$X)
+#merge gene id with gene name
+plot.data.myc234 <- plot.data.myc234 %>% left_join(Description.merge, by=c("X"="ID")) %>%  unite(AGI_desc,c("X","name"))
+#too many genes, just plot the most differentially expressed 30 genes, but the order is not correct.
+p.myc<-plot.data.myc234[1:30, ] %>% gather(sample,value,-1) %>% separate(sample,c("genotype","time_hr","trt","rep"),sep="_") %>%
+ggplot(aes(x=genotype,y=value,color=trt,shape=time_hr))  + geom_boxplot() + geom_point()+ facet_wrap(~AGI_desc,scale="free",labeller = label_wrap_gen(width=30),ncol=3)+ theme(strip.text = element_text(size=6)) + ggtitle("coef:gtmyc234+grmyc234:trtL top 30 gens from topTags")
+p.myc
+ggsave(p.myc, file = "../output/shade1h.DE30.myc.pdf", height = 30, units = "in")
+
+
+```
+
+
+
+#read differentially expressed genes in npr at 1h treatment gt*trt
+
+```{r}
+DEgenes.npr.1h <- read.csv("../output/DEgenes.npr.1h.csv")
+#cpm.1h <- read.csv("../output/cpm.1h.csv")
+```
+
+#plot genes at 1h in npr
+
+```{r}
+#only leave the gene id and sample_id column
+DEgenes.npr.1h %>% left_join(cpm.1h,by="X") %>% dplyr::select(1, contains("1h")) -> plot.data.npr
+#remove the .1 in the gene name
+plot.data.npr[,1] <- gsub("\\.\\d", "",plot.data.npr$X)
+#merge gene id with gene name
+plot.data.npr <- plot.data.npr %>% left_join(Description.merge, by=c("X"="ID")) %>%  unite(AGI_desc,c("X","name"))
+#too many genes, just plot the most differentially expressed 30 genes, but the order is not correct.
+p.npr<-plot.data.npr[1:30, ] %>% gather(sample,value,-1) %>% separate(sample,c("genotype","time_hr","trt","rep"),sep="_") %>%
+ggplot(aes(x=genotype,y=value,color=trt,shape=time_hr))  + geom_boxplot() + geom_point()+ facet_wrap(~AGI_desc,scale="free",labeller = label_wrap_gen(width=30),ncol=3)+theme(strip.text = element_text(size=6))+ ggtitle("coef:gtnpr+grnpr:trtL top 30 gens from topTags")
+p.npr
+ggsave(p.npr, file = "../output/shade1h.DE30.npr.pdf", height = 20, units = "in")
+
+
+```
+
+#read differentially expressed genes in sid at 1h treatment gt*trt
+
+```{r}
+DEgenes.sid.1h <- read.csv("../output/DEgenes.sid.1h.csv")
+#cpm.1h <- read.csv("../output/cpm.1h.csv")
+```
+
+#plot genes at 1h in sid
+
+```{r}
+#only leave the gene id and sample_id column
+DEgenes.sid.1h %>% left_join(cpm.1h,by="X") %>% dplyr::select(1, contains("1h")) -> plot.data.sid
+#remove the .1 in the gene name
+plot.data.sid[,1] <- gsub("\\.\\d", "",plot.data.sid$X)
+#merge gene id with gene name
+plot.data.sid <- plot.data.sid %>% left_join(Description.merge, by=c("X"="ID")) %>%  unite(AGI_desc,c("X","name"))
+#too many genes, just plot the most differentially expressed 30 genes, but the order is not correct.
+p.sid<-plot.data.sid[1:30, ] %>% gather(sample,value,-1) %>% separate(sample,c("genotype","time_hr","trt","rep"),sep="_") %>%
+ggplot(aes(x=genotype,y=value,color=trt,shape=time_hr))  + geom_boxplot() + geom_point()+ facet_wrap(~AGI_desc,scale="free",labeller = label_wrap_gen(width=30),ncol=3)+theme(strip.text = element_text(size=6))+ ggtitle("coef:gtsid+gtsid:trtL top 30 genes from topTags")
+p.sid
+ggsave(p.sid, file = "../output/shade1h.DE30.sid.pdf", height = 20, units = "in")
+
+
+```
+
+
+#read differentially expressed genes in myc234 at 49h treatment gt*trt
+
+```{r}
+DEgenes.myc234.49h <- read.csv("../output/DEgenes.myc234.49h.csv")
+cpm.49h <- read.csv("../output/cpm.49h.csv")
+```
+
+#plot genes at 49h in myc234
+
+```{r}
+#only leave the gene id and sample_id column
+DEgenes.myc234.49h %>% left_join(cpm.49h,by="X") %>% dplyr::select(1, contains("49h")) -> plot.data.myc234
+#remove the .1 in the gene name
+plot.data.myc234[,1] <- gsub("\\.\\d", "",plot.data.myc234$X)
+#merge gene id with gene name
+plot.data.myc234 <- plot.data.myc234 %>% left_join(Description.merge, by=c("X"="ID")) %>%  unite(AGI_desc,c("X","name"))
+#too many genes, just plot the most differentially expressed 30 genes, but the order is not correct.
+p.myc<-plot.data.myc234[1:30, ] %>% gather(sample,value,-1) %>% separate(sample,c("genotype","time_hr","trt","rep"),sep="_") %>%
+ggplot(aes(x=genotype,y=value,color=trt,shape=time_hr))  + geom_boxplot() + geom_point()+ facet_wrap(~AGI_desc,scale="free",labeller = label_wrap_gen(width=30),ncol=3)+theme(strip.text = element_text(size=6))+ggtitle("coef:gtmyc234+gtmyc234:trtL top 30 genes from topTags")
+p.myc
+ggsave(p.myc, file = "../output/shade49h.DE30.myc.pdf", height = 20, units = "in")
+
+
+```
+
+
+
+#read differentially expressed genes in npr at 49h treatment gt*trt
+
+```{r}
+DEgenes.npr.49h <- read.csv("../output/DEgenes.npr.49h.csv")
+#cpm.49h <- read.csv("../output/cpm.49h.csv")
+```
+
+#plot genes at 49h in npr
+
+```{r}
+#only leave the gene id and sample_id column
+DEgenes.npr.49h %>% left_join(cpm.49h,by="X") %>% dplyr::select(1, contains("49h")) -> plot.data.npr
+#remove the .1 in the gene name
+plot.data.npr[,1] <- gsub("\\.\\d", "",plot.data.npr$X)
+#merge gene id with gene name
+plot.data.npr <- plot.data.npr %>% left_join(Description.merge, by=c("X"="ID")) %>%  unite(AGI_desc,c("X","name"))
+#too many genes, just plot the most differentially expressed 30 genes, but the order is not correct.
+p.npr<-plot.data.npr[1:30, ] %>% gather(sample,value,-1) %>% separate(sample,c("genotype","time_hr","trt","rep"),sep="_") %>%
+ggplot(aes(x=genotype,y=value,color=trt,shape=time_hr))  + geom_boxplot() + geom_point()+ facet_wrap(~AGI_desc,scale="free",labeller = label_wrap_gen(width=30),ncol=3)+theme(strip.text = element_text(size=6))+ggtitle("coef:gtnpr+gtnpr:trtL top 30 genes from topTags")
+p.npr
+ggsave(p.npr, file = "../output/shade49h.DE30.npr.pdf", height = 20, units = "in")
+
+
+```
+
+#read differentially expressed genes in sid at 49h treatment gt*trt
+
+```{r}
+DEgenes.sid.49h <- read.csv("../output/DEgenes.sid.49h.csv")
+#cpm.49h <- read.csv("../output/cpm.49h.csv")
+```
+
+#plot genes at 49h in sid
+
+```{r}
+#only leave the gene id and sample_id column
+DEgenes.sid.49h %>% left_join(cpm.49h,by="X") %>% dplyr::select(1, contains("49h")) -> plot.data.sid
+#remove the .1 in the gene name
+plot.data.sid[,1] <- gsub("\\.\\d", "",plot.data.sid$X)
+#merge gene id with gene name
+plot.data.sid <- plot.data.sid %>% left_join(Description.merge, by=c("X"="ID")) %>%  unite(AGI_desc,c("X","name"))
+#too many genes, just plot the most differentially expressed 30 genes, but the order is not correct.
+p.sid<-plot.data.sid[1:30, ] %>% gather(sample,value,-1) %>% separate(sample,c("genotype","time_hr","trt","rep"),sep="_") %>%
+ggplot(aes(x=genotype,y=value,color=trt,shape=time_hr))  + geom_boxplot() + geom_point()+ facet_wrap(~AGI_desc,scale="free",labeller = label_wrap_gen(width=30),ncol=3)+theme(strip.text = element_text(size=6))+ggtitle("coef:gtsid+gtsid:trtL top 30 genes from topTags")
+p.sid
+ggsave(p.sid, file = "../output/shade49h.DE30.sid.pdf", height = 20, units = "in")
+
+
 ```
 

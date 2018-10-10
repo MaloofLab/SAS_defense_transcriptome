@@ -1,0 +1,352 @@
+---
+title: "GOseq_heatmap_kazu's_way"
+output: html_document
+---
+
+
+```{r}
+library(ShortRead);library(goseq);library(GO.db);library("annotate")
+```
+```{r}
+getwd()
+At_cdna<-Biostrings::readDNAStringSet("../reference/TAIR10_cdna_20110103_representative_gene_model_updated.1")
+At_cdna
+At_cdna$
+```
+
+
+```{r}
+Atgoslim.TAIR<-read_tsv("../reference/ATH_GO_GOSLIM.txt",skip=2,col_names = FALSE )
+```
+
+```{r}
+head(Atgoslim.TAIR)
+Atgoslim.TAIR %>% filter(X8=="P",X1=="AT4G38360") %>% dplyr::select(1,5,6,8,9,10)###what does this mean? means BP  biological process
+Atgoslim.TAIR.BP <-Atgoslim.TAIR%>% filter(X8=="P")
+head(Atgoslim.TAIR.BP)
+Atgoslim.TAIR.BP.list<-tapply(Atgoslim.TAIR.BP$X6,Atgoslim.TAIR.BP$X1,c)
+head(Atgoslim.TAIR.BP.list)
+save(Atgoslim.TAIR.BP.list, list,file=file.path("../output","Atgoslim.TAIR.BP.list.Rdata"))
+
+Atgoslim.TAIR.CC <-Atgoslim.TAIR%>% filter(X8=="C")
+head(Atgoslim.TAIR.CC)
+Atgoslim.TAIR.CC.list<-tapply(Atgoslim.TAIR.CC$X6,Atgoslim.TAIR.CC$X1,c)
+head(Atgoslim.TAIR.CC.list)
+save(Atgoslim.TAIR.CC.list, list,file=file.path("../output","Atgoslim.TAIR.CC.list.Rdata"))
+```
+#import expressed genes 
+
+```{r}
+expressed.genes <- read_csv("../output/expressed_genes_counts.csv")
+expressed.genes <- expressed.genes$target_id
+expressed.genes <- as.data.frame(expressed.genes)
+head(expressed.genes)
+colnames(expressed.genes) <- "gene_id"
+expressed.genes$gene_id <- gsub("\\.\\d", "", expressed.genes$gene_id)
+head(expressed.genes)
+```
+
+
+
+```{r}
+GOseq.Atgoslim.BP.list.ORA<-function(genelist,padjust=0.05,ontology="BP",custom.category.list=Atgoslim.TAIR.BP.list,cdna=At_cdna,expressed.genes=expressed.genes) { # return GO enrichment table, padjus, padjust=0.05. 
+  bias<-nchar(cdna)#to get the length of each gene
+  names(bias)<-tibble(AGI=names(cdna)) %>% separate(AGI,into="AGI2",pattern="|",extra="drop") %>% dplyr::select(AGI2) %>% as_vector()# to get the AGI of each gene
+  table(duplicated(names(bias)))# to see if there is duplicated AGI
+  #TF<-(names(bias) %in% genelist)*1
+  bias <- bias[names(bias)%in%expressed.genes$gene_id] # use only expressed genes in the experiment as reference
+  TF<-as.integer(names(bias) %in% genelist)
+  names(TF)<-names(bias)
+  #print(TF)
+  pwf<-nullp(TF,bias.data=bias)
+  #print(pwf$DEgenes)
+  GO.pval <- goseq(pwf,gene2cat=custom.category.list,use_genes_without_cat=TRUE) # format became different in new goseq version (021111). Does not work (042716)
+  #head(GO.pval) 
+  if(ontology=="BP") {
+    GO.pval2<-subset(GO.pval,ontology=="BP")
+  } else if(ontology=="CC") {
+    GO.pval2<-subset(GO.pval,ontology=="CC")
+  } else {
+    GO.pval2<-subset(GO.pval,ontology=="MF")
+  }
+  # calculating padjust by BH  
+  GO.pval2$over_represented_padjust<-p.adjust(GO.pval2$over_represented_pvalue,method="BH")
+  if(GO.pval2$over_represented_padjust[1]>padjust) return("no enriched GO")
+  else {
+    enriched.GO<-GO.pval2[GO.pval2$over_represented_padjust<padjust,] 
+    print("enriched.GO is")
+    print(enriched.GO)
+    
+    ## write Term and Definition 
+    for(i in 1:dim(enriched.GO)[1]) {
+      if(is.null(Term(GOTERM[enriched.GO[i,"category"]]))) {next} else {
+      enriched.GO$Term[i]<-Term(GOTERM[[enriched.GO[i,"category"]]])
+      enriched.GO$Definition[i]<-Definition(GOTERM[[enriched.GO[i,"category"]]])
+      }
+    }
+    return(enriched.GO)
+  }
+}
+
+```
+
+
+
+#for shade regulated genes in Col at 1 and 49 hour treatment, not consider the interaction
+```{r}
+#1h
+DEgene.Col.1h <- read.csv("../output/DEgenes.Col.1h.sep.csv")
+head(DEgene.Col.1h)
+colnames(DEgene.Col.1h)[1] <- "gene_id"
+head(DEgene.Col.1h)
+DEgene.Col.1h$gene_id <- gsub("\\.\\d", "", DEgene.Col.1h$gene_id)
+head(DEgene.Col.1h)
+shade1h.up.Col <- DEgene.Col.1h%>% filter(logFC > 0)
+shade1h.down.Col <- DEgene.Col.1h%>% filter(logFC < 0)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade1h.up.Col$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade1h.down.Col$gene_id, expressed.genes = expressed.genes)
+
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade1h.up.Col$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade1h.down.Col$gene_id, expressed.genes = expressed.genes)
+```
+
+```{r}
+#49h
+DEgene.Col.49h <- read.csv("../output/DEgenes.Col.49h.sep.csv")
+head(DEgene.Col.49h)
+colnames(DEgene.Col.49h)[1] <- "gene_id"
+head(DEgene.Col.49h)
+DEgene.Col.49h$gene_id <- gsub("\\.\\d", "", DEgene.Col.49h$gene_id)
+head(DEgene.Col.49h)
+shade49h.up.Col <- DEgene.Col.49h%>% filter(logFC > 0)
+shade49h.down.Col <- DEgene.Col.49h%>% filter(logFC < 0)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade49h.up.Col$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade49h.down.Col$gene_id, expressed.genes = expressed.genes)
+
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade49h.up.Col$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade49h.down.Col$gene_id, expressed.genes = expressed.genes)
+```
+
+#for shade regulated genes in myc234 at 1 and 49 hour treatment, not consider the interaction
+```{r}
+#1h
+DEgene.myc234.1h <- read.csv("../output/DEgenes.myc234.1h.sep.csv")
+head(DEgene.myc234.1h)
+colnames(DEgene.myc234.1h)[1] <- "gene_id"
+head(DEgene.myc234.1h)
+DEgene.myc234.1h$gene_id <- gsub("\\.\\d", "", DEgene.myc234.1h$gene_id)
+head(DEgene.myc234.1h)
+shade1h.up.myc234 <- DEgene.myc234.1h%>% filter(logFC > 0)
+shade1h.down.myc234 <- DEgene.myc234.1h%>% filter(logFC < 0)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade1h.up.myc234$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade1h.down.myc234$gene_id, expressed.genes = expressed.genes)
+
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade1h.up.myc234$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade1h.down.myc234$gene_id, expressed.genes = expressed.genes)
+```
+
+```{r}
+#49h
+DEgene.myc234.49h <- read.csv("../output/DEgenes.myc234.49h.sep.csv")
+head(DEgene.myc234.49h)
+colnames(DEgene.myc234.49h)[1] <- "gene_id"
+head(DEgene.myc234.49h)
+DEgene.myc234.49h$gene_id <- gsub("\\.\\d", "", DEgene.myc234.49h$gene_id)
+head(DEgene.myc234.49h)
+shade49h.up.myc234 <- DEgene.myc234.49h%>% filter(logFC > 0)
+shade49h.down.myc234 <- DEgene.myc234.49h%>% filter(logFC < 0)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade49h.up.myc234$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade49h.down.myc234$gene_id, expressed.genes = expressed.genes)
+
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade49h.up.myc234$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade49h.down.myc234$gene_id, expressed.genes = expressed.genes)
+```
+
+#for shade regulated genes in npr at 1 and 49 hour treatment, not consider the interaction
+```{r}
+#1h
+DEgene.npr.1h <- read.csv("../output/DEgenes.npr.1h.sep.csv")
+head(DEgene.npr.1h)
+colnames(DEgene.npr.1h)[1] <- "gene_id"
+head(DEgene.npr.1h)
+DEgene.npr.1h$gene_id <- gsub("\\.\\d", "", DEgene.npr.1h$gene_id)
+head(DEgene.npr.1h)
+shade1h.up.npr <- DEgene.npr.1h%>% filter(logFC > 0)
+shade1h.down.npr <- DEgene.npr.1h%>% filter(logFC < 0)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade1h.up.npr$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade1h.down.npr$gene_id, expressed.genes = expressed.genes)
+
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade1h.up.npr$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade1h.down.npr$gene_id, expressed.genes = expressed.genes)
+
+```
+
+```{r}
+#49h
+DEgene.npr.49h <- read.csv("../output/DEgenes.npr.49h.sep.csv")
+head(DEgene.npr.49h)
+colnames(DEgene.npr.49h)[1] <- "gene_id"
+head(DEgene.npr.49h)
+DEgene.npr.49h$gene_id <- gsub("\\.\\d", "", DEgene.npr.49h$gene_id)
+head(DEgene.npr.49h)
+shade49h.up.npr <- DEgene.npr.49h%>% filter(logFC > 0)
+shade49h.down.npr <- DEgene.npr.49h%>% filter(logFC < 0)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade49h.up.npr$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade49h.down.npr$gene_id, expressed.genes = expressed.genes)
+
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade49h.up.npr$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade49h.down.npr$gene_id, expressed.genes = expressed.genes)
+```
+
+
+
+
+#for shade regulated genes in sid at 1 and 49 hour treatment, not consider the interaction
+```{r}
+#1h
+DEgene.sid.1h <- read.csv("../output/DEgenes.sid.1h.sep.csv")
+head(DEgene.sid.1h)
+colnames(DEgene.sid.1h)[1] <- "gene_id"
+head(DEgene.sid.1h)
+DEgene.sid.1h$gene_id <- gsub("\\.\\d", "", DEgene.sid.1h$gene_id)
+head(DEgene.sid.1h)
+shade1h.up.sid <- DEgene.sid.1h%>% filter(logFC > 0)
+shade1h.down.sid <- DEgene.sid.1h%>% filter(logFC < 0)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade1h.up.sid$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade1h.down.sid$gene_id, expressed.genes = expressed.genes)
+
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade1h.up.sid$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade1h.down.sid$gene_id, expressed.genes = expressed.genes)
+```
+
+```{r}
+#49h
+DEgene.sid.49h <- read.csv("../output/DEgenes.sid.49h.sep.csv")
+head(DEgene.sid.49h)
+colnames(DEgene.sid.49h)[1] <- "gene_id"
+head(DEgene.sid.49h)
+DEgene.sid.49h$gene_id <- gsub("\\.\\d", "", DEgene.sid.49h$gene_id)
+head(DEgene.sid.49h)
+shade49h.up.sid <- DEgene.sid.49h%>% filter(logFC > 0)
+shade49h.down.sid <- DEgene.sid.49h%>% filter(logFC < 0)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade49h.up.sid$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade49h.down.sid$gene_id, expressed.genes = expressed.genes)
+
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade49h.up.sid$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade49h.down.sid$gene_id, expressed.genes = expressed.genes)
+```
+
+
+
+#for the interaction, for myc234, Col and H as refference
+
+```{r}
+#1h
+DEgene.myc234.1h <- read.csv("../output/DEgenes.myc234.1h.csv")
+head(DEgene.myc234.1h)
+colnames(DEgene.myc234.1h)[1] <- "gene_id"
+head(DEgene.myc234.1h)
+DEgene.myc234.1h$gene_id <- gsub("\\.\\d", "", DEgene.myc234.1h$gene_id)
+head(DEgene.myc234.1h)
+shade1h.up.myc234 <- DEgene.myc234.1h%>% filter(logFC.gtmyc234 > 0)
+shade1h.down.myc234 <- DEgene.myc234.1h%>% filter(logFC.gtmyc234 < 0)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade1h.up.myc234$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade1h.down.myc234$gene_id, expressed.genes = expressed.genes)
+
+
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade1h.up.myc234$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade1h.down.myc234$gene_id, expressed.genes = expressed.genes)
+
+```
+
+```{r}
+#49h
+DEgene.myc234.49h <- read.csv("../output/DEgenes.myc234.49h.csv")
+head(DEgene.myc234.49h)
+colnames(DEgene.myc234.49h)[1] <- "gene_id"
+head(DEgene.myc234.49h)
+DEgene.myc234.49h$gene_id <- gsub("\\.\\d", "", DEgene.myc234.49h$gene_id)
+head(DEgene.myc234.49h)
+shade49h.up.myc234 <- DEgene.myc234.49h%>% filter(logFC.gtmyc234 > 0)
+shade49h.down.myc234 <- DEgene.myc234.49h%>% filter(logFC.gtmyc234 < 0)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade49h.up.myc234$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade49h.down.myc234$gene_id, expressed.genes = expressed.genes)
+
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade49h.up.myc234$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade49h.down.myc234$gene_id, expressed.genes = expressed.genes)
+```
+
+#for npr, interaction, Col and L as reference
+```{r}
+#1h
+DEgene.npr.1h <- read.csv("../output/DEgenes.npr.1h.csv")
+head(DEgene.npr.1h)
+colnames(DEgene.npr.1h)[1] <- "gene_id"
+head(DEgene.npr.1h)
+DEgene.npr.1h$gene_id <- gsub("\\.\\d", "", DEgene.npr.1h$gene_id)
+head(DEgene.npr.1h)
+shade1h.up.npr <- DEgene.npr.1h%>% filter(logFC.gtnpr > 0)
+shade1h.down.npr <- DEgene.npr.1h%>% filter(logFC.gtnpr < 0)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade1h.up.npr$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade1h.down.npr$gene_id, expressed.genes = expressed.genes)
+
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade1h.up.npr$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade1h.down.npr$gene_id, expressed.genes = expressed.genes)
+
+```
+
+```{r}
+#49h
+DEgene.npr.49h <- read.csv("../output/DEgenes.npr.49h.csv")
+head(DEgene.npr.49h)
+colnames(DEgene.npr.49h)[1] <- "gene_id"
+head(DEgene.npr.49h)
+DEgene.npr.49h$gene_id <- gsub("\\.\\d", "", DEgene.npr.49h$gene_id)
+head(DEgene.npr.49h)
+shade49h.up.npr <- DEgene.npr.49h%>% filter(logFC.gtnpr > 0)
+shade49h.down.npr <- DEgene.npr.49h%>% filter(logFC.gtnpr < 0)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade49h.up.npr$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade49h.down.npr$gene_id, expressed.genes = expressed.genes)
+
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade49h.up.npr$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade49h.down.npr$gene_id, expressed.genes = expressed.genes)
+```
+
+#for sid , interaction
+
+```{r}
+#1h
+DEgene.sid.1h <- read.csv("../output/DEgenes.sid.1h.csv")
+head(DEgene.sid.1h)
+colnames(DEgene.sid.1h)[1] <- "gene_id"
+head(DEgene.sid.1h)
+DEgene.sid.1h$gene_id <- gsub("\\.\\d", "", DEgene.sid.1h$gene_id)
+head(DEgene.sid.1h)
+shade1h.up.sid <- DEgene.sid.1h%>% filter(logFC.gtsid > 0)
+shade1h.down.sid <- DEgene.sid.1h%>% filter(logFC.gtsid < 0)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade1h.up.sid$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade1h.down.sid$gene_id, expressed.genes = expressed.genes)
+
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade1h.up.sid$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade1h.down.sid$gene_id, expressed.genes = expressed.genes)
+```
+
+```{r}
+#49h
+DEgene.sid.49h <- read.csv("../output/DEgenes.sid.49h.csv")
+head(DEgene.sid.49h)
+colnames(DEgene.sid.49h)[1] <- "gene_id"
+head(DEgene.sid.49h)
+DEgene.sid.49h$gene_id <- gsub("\\.\\d", "", DEgene.sid.49h$gene_id)
+head(DEgene.sid.49h)
+shade49h.up.sid <- DEgene.sid.49h%>% filter(logFC.gtsid > 0)
+shade49h.down.sid <- DEgene.sid.49h%>% filter(logFC.gtsid < 0)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade49h.up.sid$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(genelist=shade49h.down.sid$gene_id, expressed.genes = expressed.genes)
+
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade49h.up.sid$gene_id, expressed.genes = expressed.genes)
+GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade49h.down.sid$gene_id, expressed.genes = expressed.genes)
+```
+
+
+

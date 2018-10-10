@@ -69,7 +69,7 @@ hist.genotype <- function(data, genotype){
 counts.transformed.hist.genotype
 }
 
-hist.genotype(counts.data, "npr")
+hist.genotype(counts.data, "sid")
 ```
 
 
@@ -87,7 +87,7 @@ write.csv(counts.data.spread, file = "../output/total_counts_data.csv")
 # retain the genes with >10 reads in 3 samples
 # currently don't quite understand, but after removing these genes, the MDS plot looks better
 counts.data.spread <- counts.data.spread[rowSums(counts.data.spread[,-1] > 10) >= 3,]
-
+write.csv(counts.data.spread, file = "../output/expressed_genes_counts.csv")
 head(counts.data.spread)
 ```
 
@@ -115,7 +115,7 @@ library(stringr)
 sample.description <- sample.description %>% 
   #This next line searches for genotypes in the colnames of counts.data.spread and returns anything that matches
   #In this way we can extract the genotype info.
-  mutate(gt=str_extract(sample,"Col|myc234|npr|sid")) %>%
+  mutate(gt=str_extract(sample,"Col|myc234|sid|sid")) %>%
   
   #Now we use the same method to get the treatment
   mutate(trt=str_extract(sample,"H|L")) %>%
@@ -131,7 +131,7 @@ sample.description
 #next convert gt and trt into group variables (factors)
 
 sample.description <- sample.description %>%
-  mutate(gt=factor(gt, levels = c("Col", "myc234", "npr", "sid")), 
+  mutate(gt=factor(gt, levels = c("Col", "myc234", "sid", "sid")), 
          trt=factor(trt,levels = c("H","L")),
          tp=factor(tp, levels = c("1h", "49h"))
          ) # setting the levels in this way makes "H" the refernce  
@@ -534,6 +534,8 @@ sample.description.1h <- sample.description.1h %>%
   mutate(trt=str_extract(sample,"H|L")) %>%
   #Now for time points
   mutate(tp=str_extract(sample, "1h")) %>%
+  #add the replicate factor
+  mutate(rep=str_extract(sample, "R1|R2|R3|R4")) %>%
   
   # paste the trt, gt, tp columns together to give a group identifier
 
@@ -546,7 +548,8 @@ sample.description.1h
 sample.description.1h <- sample.description.1h %>%
   mutate(gt=factor(gt, levels=c("Col", "myc234", "npr", "sid")), 
          trt=factor(trt,levels = c("H","L")),
-         tp=as.factor(tp)
+         tp=as.factor(tp),
+         rep=as.factor(rep)
          ) # setting the levels in this way makes "H" the refernce  
 
 sample.description.1h
@@ -568,7 +571,7 @@ dge.data.1h$samples # look at the normalization factors
 ```
 #design 1h
 ```{r}
-design.1h <- model.matrix(~gt*trt,data = sample.description.1h)
+design.1h <- model.matrix(~gt*trt+rep,data = sample.description.1h)
 rownames(design.1h) <- sample.description.1h$sample
 design.1h
 ```
@@ -593,7 +596,7 @@ plotBCV(dge.data.1h)
 #just for the genes differentially expressed in myc234 gt*trt , 
 ```{r}
 fit.1h <- glmFit(dge.data.1h, design.1h)
-myc234.1h.lrt <- glmLRT(fit.1h,coef =6)
+myc234.1h.lrt <- glmLRT(fit.1h,coef =  c("gtmyc234", "gtmyc234:trtL"))
 topTags(myc234.1h.lrt) # the top 10 most differentially expressed genes
 summary(decideTestsDGE(myc234.1h.lrt,p.value=0.01)) #This uses the FDR.
 summary(decideTestsDGE(myc234.1h.lrt,p.value=0.05)) #This uses the FDR.  0.05 would be OK also.
@@ -613,5 +616,392 @@ write.csv(DEgene.myc234.1h,"../output/DEgenes.myc234.1h.csv")
 #plot genes differentially expressed at 1h shade treatment in myc234.
 
 ```{r}
-plotDE(rownames(DEgene.myc234.1h),dge.data.1h,sample.description.1h)
+plotDE(rownames(DEgene.myc234.1h)[1:6],dge.data.1h,sample.description.1h)
 ```
+
+#just for the genes differentially expressed in npr gt*trt , 
+```{r}
+#fit.1h <- glmFit(dge.data.1h, design.1h)
+npr.1h.lrt <- glmLRT(fit.1h,coef = c("gtnpr","gtnpr:trtL"))
+topTags(npr.1h.lrt) # the top 10 most differentially expressed genes
+summary(decideTestsDGE(npr.1h.lrt,p.value=0.01)) #This uses the FDR.
+summary(decideTestsDGE(npr.1h.lrt,p.value=0.05)) #This uses the FDR.  0.05 would be OK also.
+```
+#save the differentially expressed genes at 0.05 in npr
+
+```{r}
+#Extract genes with a FDR < 0.01 (could also use 0.05)
+DEgene.npr.1h <- topTags(npr.1h.lrt,n = Inf,p.value = 0.05)$table
+rownames(DEgene.npr.1h) <- NULL
+DEgene.npr.1h <- column_to_rownames(DEgene.npr.1h, var = "genes")
+#save to a file
+getwd()
+write.csv(DEgene.npr.1h,"../output/DEgenes.npr.1h.csv")
+```
+
+#plot genes differentially expressed at 1h shade treatment in npr.
+
+```{r}
+plotDE(rownames(DEgene.npr.1h)[1:6],dge.data.1h,sample.description.1h)
+```
+
+#just for the genes differentially expressed in sid gt*trt , 
+```{r}
+#fit.1h <- glmFit(dge.data.1h, design.1h)
+sid.1h.lrt <- glmLRT(fit.1h,coef = c("gtsid","gtsid:trtL"))
+topTags(sid.1h.lrt) # the top 10 most differentially expressed genes
+summary(decideTestsDGE(sid.1h.lrt,p.value=0.01)) #This uses the FDR.
+summary(decideTestsDGE(sid.1h.lrt,p.value=0.05)) #This uses the FDR.  0.05 would be OK also.
+```
+#save the differentially expressed genes at 0.05 in sid
+
+```{r}
+#Extract genes with a FDR < 0.01 (could also use 0.05)
+DEgene.sid.1h <- topTags(sid.1h.lrt,n = Inf,p.value = 0.05)$table
+rownames(DEgene.sid.1h) <- NULL
+DEgene.sid.1h <- column_to_rownames(DEgene.sid.1h, var = "genes")
+#save to a file
+getwd()
+write.csv(DEgene.sid.1h,"../output/DEgenes.sid.1h.csv")
+```
+
+#plot genes differentially expressed at 1h shade treatment in sid.
+
+```{r}
+plotDE(rownames(DEgene.sid.1h)[1:6],dge.data.1h,sample.description.1h)
+```
+
+
+# subset data at 49h treatment
+```{r}
+#subset counts.data.spread
+
+counts.data.spread.49h <- counts.data.spread[,-1][, str_detect(colnames(counts.data.spread[,-1]), "49h")]
+counts.data.spread.49h$target_id <- counts.data.spread$target_id
+head(counts.data.spread.49h)
+counts.data.spread.49h <- counts.data.spread.49h[, c(33, 1:32)]#shift the last column target_id to the first column
+head(counts.data.spread.49h)
+```
+# assign groups 
+```{r}
+sample.description.49h <- tibble(sample=colnames(counts.data.spread.49h)[-1])
+sample.description.49h
+library(stringr)
+sample.description.49h <- sample.description.49h %>% 
+  #This next line searches for genotypes in the colnames of counts.data.spread and returns anything that matches
+  #In this way we can extract the genotype info.
+  mutate(gt=str_extract(sample,"Col|myc234|npr|sid")) %>%
+  
+  #Now we use the same method to get the treatment
+  mutate(trt=str_extract(sample,"H|L")) %>%
+  #Now for time points
+  mutate(tp=str_extract(sample, "49h")) %>%
+  #add the replicate factor
+  mutate(rep=str_extract(sample, "R1|R2|R3|R4")) %>%
+  
+  # paste the trt, gt, tp columns together to give a group identifier
+
+  mutate(group=str_c(gt,trt,tp, sep = "_"))
+
+sample.description.49h
+
+#next convert gt and trt into group variables (factors)
+
+sample.description.49h <- sample.description.49h %>%
+  mutate(gt=factor(gt, levels=c("Col", "myc234", "npr", "sid")), 
+         trt=factor(trt,levels = c("H","L")),
+         tp=as.factor(tp),
+         rep=as.factor(rep)
+         ) # setting the levels in this way makes "H" the refernce  
+
+sample.description.49h
+```
+
+#calculate normalization factor for 49h data
+
+```{r}
+library(edgeR)
+counts.matrix.49h <- counts.data.spread.49h %>% dplyr::select(-target_id) %>% as.matrix()
+rownames(counts.matrix.49h) <- counts.data.spread.49h$target_id
+dge.data.49h <- DGEList(counts=counts.matrix.49h, 
+                    samples = sample.description.49h,
+                    genes = counts.data.spread.49h$target_id,
+                    group=sample.description.49h$group)
+dim(dge.data.49h) 
+dge.data.49h <- calcNormFactors(dge.data.49h, method = "TMM")
+dge.data.49h$samples # look at the normalization factors
+```
+#design 49h
+```{r}
+design.49h <- model.matrix(~gt*trt+rep,data = sample.description.49h)
+rownames(design.49h) <- sample.description.49h$sample
+design.49h
+```
+
+
+```{r}
+#First the overall dispersion
+dge.data.49h <- estimateGLMCommonDisp(dge.data.49h,design.49h,verbose = TRUE)
+
+#Then a trended dispersion based on count level
+dge.data.49h <- estimateGLMTrendedDisp(dge.data.49h,design.49h)
+
+#And lastly we calculate the gene-wise dispersion, using the prior estimates to "squeeze" the dispersion towards the common dispersion.
+dge.data.49h <- estimateGLMTagwiseDisp(dge.data.49h,design.49h)
+
+#We can examine this with a plot
+plotBCV(dge.data.49h)
+```
+
+
+
+#just for the genes differentially expressed in myc234 gt*trt , 
+```{r}
+fit.49h <- glmFit(dge.data.49h, design.49h)
+myc234.49h.lrt <- glmLRT(fit.49h,coef ="gtmyc234:trtL")
+topTags(myc234.49h.lrt) # the top 10 most differentially expressed genes
+summary(decideTestsDGE(myc234.49h.lrt,p.value=0.01)) #This uses the FDR.
+summary(decideTestsDGE(myc234.49h.lrt,p.value=0.05)) #This uses the FDR.  0.05 would be OK also.
+```
+#save the differentially expressed genes at 0.05 in myc234
+
+```{r}
+#Extract genes with a FDR < 0.01 (could also use 0.05)
+DEgene.myc234.49h <- topTags(myc234.49h.lrt,n = Inf,p.value = 0.05)$table
+rownames(DEgene.myc234.49h) <- NULL
+DEgene.myc234.49h <- column_to_rownames(DEgene.myc234.49h, var = "genes")
+#save to a file
+getwd()
+write.csv(DEgene.myc234.49h,"../output/DEgenes.myc234.49h.interaction.csv")
+```
+
+#plot genes differentially expressed at 49h shade treatment in myc234.
+
+```{r}
+plotDE(rownames(DEgene.myc234.49h),dge.data.49h,sample.description.49h)
+```
+
+#just for the genes differentially expressed in npr gt*trt , 
+```{r}
+#fit.49h <- glmFit(dge.data.49h, design.49h)
+npr.49h.lrt <- glmLRT(fit.49h,coef = "gtnpr:trtL")
+topTags(npr.49h.lrt) # the top 10 most differentially expressed genes
+summary(decideTestsDGE(npr.49h.lrt,p.value=0.01)) #This uses the FDR.
+summary(decideTestsDGE(npr.49h.lrt,p.value=0.05)) #This uses the FDR.  0.05 would be OK also.
+```
+#save the differentially expressed genes at 0.05 in npr
+
+```{r}
+#Extract genes with a FDR < 0.01 (could also use 0.05)
+DEgene.npr.49h <- topTags(npr.49h.lrt,n = Inf,p.value = 0.05)$table
+rownames(DEgene.npr.49h) <- NULL
+DEgene.npr.49h <- column_to_rownames(DEgene.npr.49h, var = "genes")
+#save to a file
+getwd()
+write.csv(DEgene.npr.49h,"../output/DEgenes.npr.49h.interaction.csv")
+```
+
+#plot genes differentially expressed at 49h shade treatment in npr.
+
+```{r}
+plotDE(rownames(DEgene.npr.49h),dge.data.49h,sample.description.49h)
+```
+
+#just for the genes differentially expressed in sid gt*trt , 
+```{r}
+#fit.49h <- glmFit(dge.data.49h, design.49h)
+sid.49h.lrt <- glmLRT(fit.49h,coef = c("gtsid","gtsid:trtL"))
+topTags(sid.49h.lrt) # the top 10 most differentially expressed genes
+summary(decideTestsDGE(sid.49h.lrt,p.value=0.01)) #This uses the FDR.
+summary(decideTestsDGE(sid.49h.lrt,p.value=0.05)) #This uses the FDR.  0.05 would be OK also.
+```
+#save the differentially expressed genes at 0.05 in sid
+
+```{r}
+#Extract genes with a FDR < 0.01 (could also use 0.05)
+DEgene.sid.49h <- topTags(sid.49h.lrt,n = Inf,p.value = 0.05)$table
+rownames(DEgene.sid.49h) <- NULL
+DEgene.sid.49h <- column_to_rownames(DEgene.sid.49h, var = "genes")
+#save to a file
+getwd()
+write.csv(DEgene.sid.49h,"../output/DEgenes.sid.49h.csv")
+```
+
+#plot genes differentially expressed at 49h shade treatment in sid.
+
+```{r}
+plotDE(rownames(DEgene.sid.49h)[1:6],dge.data.49h,sample.description.49h)
+```
+
+#save files
+```{r}
+
+cpm.1h <- cpm(dge.data.1h)
+write.csv(cpm.1h, "../output/cpm.1h.csv")
+cpm.49h <- cpm(dge.data.49h)
+write.csv(cpm.49h, "../output/cpm.49h.csv")
+#save all genes expressed in myc234 at 1h
+genes.myc234.1h <- topTags(myc234.1h.lrt,n = Inf)$table
+rownames(genes.myc234.1h) <- NULL
+genes.myc234.1h <- column_to_rownames(genes.myc234.1h, var = "genes")
+write.csv(genes.myc234.1h, "../output/genes.myc234.1h.csv")
+#save all genes expressed in npr1 at 1h
+genes.npr.1h <- topTags(npr.1h.lrt,n = Inf)$table
+rownames(genes.npr.1h) <- NULL
+genes.npr.1h <- column_to_rownames(genes.npr.1h, var = "genes")
+write.csv(genes.npr.1h, "../output/genes.npr.1h.csv")
+
+#save all genes expressed in sid at 1h
+genes.sid.1h <- topTags(sid.1h.lrt,n = Inf)$table
+rownames(genes.sid.1h) <- NULL
+genes.sid.1h <- column_to_rownames(genes.sid.1h, var = "genes")
+write.csv(genes.sid.1h, "../output/genes.sid.1h.csv")
+
+
+#save all genes expressed in myc234 at 49h
+genes.myc234.49h <- topTags(myc234.49h.lrt,n = Inf)$table
+rownames(genes.myc234.49h) <- NULL
+genes.myc234.49h <- column_to_rownames(genes.myc234.49h, var = "genes")
+write.csv(genes.myc234.49h, "../output/genes.myc234.49h.csv")
+#save all genes expressed in npr1 at 49h
+genes.npr.49h <- topTags(npr.49h.lrt,n = Inf)$table
+rownames(genes.npr.49h) <- NULL
+genes.npr.49h <- column_to_rownames(genes.npr.49h, var = "genes")
+write.csv(genes.npr.49h, "../output/genes.npr.49h.csv")
+
+#save all genes expressed in sid at 49h
+genes.sid.49h <- topTags(sid.49h.lrt,n = Inf)$table
+rownames(genes.sid.49h) <- NULL
+genes.sid.49h <- column_to_rownames(genes.sid.49h, var = "genes")
+write.csv(genes.sid.49h, "../output/genes.sid.49h.csv")
+```
+
+
+
+#100818
+#subset only 1h treatment data in the other 3 genotypes to see if the differentially expressed genes in Col have the same expression pattern in these 3 genotypes, since for the only genotype*trt interaction part, there is only 1 gene in both myc234 and npr1 at 49h treatment time point.
+
+
+## 49h sid data
+#subset sid 49h treatment
+
+```{r}
+#subset counts.data.spread
+counts.data.spread.sid.49h <- counts.data.spread %>% dplyr::select(1, 58:65)
+```
+# assign groups 
+```{r}
+sample.description.sid.49h <- tibble(sample=colnames(counts.data.spread.sid.49h)[-1])
+sample.description.sid.49h
+library(stringr)
+sample.description.sid.49h <- sample.description.sid.49h %>% 
+  #This next line searches for genotypes in the Colnames of counts.data.spread and returns anything that matches
+  #In this way we can extract the genotype info.
+  mutate(gt=str_extract(sample,"sid")) %>%
+  
+  #Now we use the same method to get the treatment
+  mutate(trt=str_extract(sample,"H|L")) %>%
+  #Now for time points
+  mutate(tp=str_extract(sample, "49h")) %>%
+  mutate(rep=str_extract(sample, "R1|R2|R3|R4")) %>%
+  
+  # paste the trt, gt, tp sidumns together to give a group identifier
+
+  mutate(group=str_c(gt,trt,tp, sep = "_"))
+
+sample.description.sid.49h
+
+#next convert gt and trt into group variables (factors)
+
+sample.description.sid.49h <- sample.description.sid.49h %>%
+  mutate(gt=as.factor(gt), 
+         trt=factor(trt,levels = c("H","L")),
+         tp=as.factor(tp)
+         ) # setting the levels in this way makes "H" the refernce  
+
+sample.description.sid.49h
+```
+
+#calculate normalization factor for 49h sid data
+
+```{r}
+library(edgeR)
+counts.matrix.sid.49h <- counts.data.spread.sid.49h %>% dplyr::select(-target_id) %>% as.matrix()
+rownames(counts.matrix.sid.49h) <- counts.data.spread.sid.49h$target_id
+
+dge.data.49h.sid <- DGEList(counts=counts.matrix.sid.49h, 
+                    samples = sample.description.sid.49h,
+                    genes = counts.data.spread.sid.49h$target_id,
+                    group=sample.description.sid.49h$group)
+dim(dge.data.49h.sid) 
+dge.data.49h.sid <- calcNormFactors(dge.data.49h.sid, method = "TMM")
+dge.data.49h.sid$samples # look at the normalization factors
+```
+#design sid_49h
+```{r}
+design.sid.49h <- model.matrix(~trt+rep,data = sample.description.sid.49h)
+rownames(design.sid.49h) <- sample.description.sid.49h$sample
+design.sid.49h
+```
+
+
+```{r}
+#First the overall dispersion
+dge.data.49h.sid <- estimateGLMCommonDisp(dge.data.49h.sid,design.sid.49h,verbose = TRUE)
+
+#Then a trended dispersion based on count level
+dge.data.49h.sid <- estimateGLMTrendedDisp(dge.data.49h.sid,design.sid.49h)
+
+#And lastly we calculate the gene-wise dispersion, using the prior estimates to "squeeze" the dispersion towards the common dispersion.
+dge.data.49h.sid <- estimateGLMTagwiseDisp(dge.data.49h.sid,design.sid.49h)
+
+#We can examine this with a plot
+plotBCV(dge.data.49h.sid)
+```
+
+
+
+#just for the genes differentially expressed in sid under 49h shade treatment, 
+```{r}
+fit.sid.49h <- glmFit(dge.data.49h.sid, design.sid.49h)
+sid.49h.lrt <- glmLRT(fit.sid.49h,coef = "trtL")
+topTags(sid.49h.lrt) # the top 10 most differentially expressed genes
+summary(decideTestsDGE(sid.49h.lrt,p.value=0.01)) #This uses the FDR.
+summary(decideTestsDGE(sid.49h.lrt,p.value=0.05)) #This uses the FDR.  0.05 would be OK also.
+```
+#save the differentially expressed genes at 0.05
+
+```{r}
+#Extract genes with a FDR < 0.01 (could also use 0.05)
+DEgene.sid.49h <- topTags(sid.49h.lrt,n = Inf,p.value = 0.05)$table
+rownames(DEgene.sid.49h) <- NULL
+DEgene.sid.49h <- column_to_rownames(DEgene.sid.49h, var = "genes")
+#save to a file
+getwd()
+write.csv(DEgene.sid.49h,"../output/DEgenes.sid.49h.sep.csv")
+```
+
+#plot genes differentially expressed at 49h shade treatment.
+
+```{r}
+plotDE(rownames(DEgene.sid.49h)[1:10],dge.data.49h.sid,sample.description.sid.49h)
+```
+
+
+```{r}
+#save the cpm data for each genotype when consider only treatment effect, after subset the data by genotype and time point, to plot the expression pattern in each genotype
+cpm.myc234.1h <- cpm(dge.data.1h.myc234)
+write.csv(cpm.myc234.1h, "../output/cpm.1h.myc234.csv")
+cpm.npr.1h <- cpm(dge.data.1h.npr)
+write.csv(cpm.npr.1h, "../output/cpm.1h.npr.csv")
+cpm.sid.1h <- cpm(dge.data.1h.sid)
+write.csv(cpm.sid.1h, "../output/cpm.1h.sid.csv")
+
+cpm.myc234.49h <- cpm(dge.data.49h.myc234)
+write.csv(cpm.myc234.49h, "../output/cpm.49h.myc234.csv")
+cpm.npr.49h <- cpm(dge.data.49h.npr)
+write.csv(cpm.npr.49h, "../output/cpm.49h.npr.csv")
+cpm.sid.49h <- cpm(dge.data.49h.sid)
+write.csv(cpm.sid.49h, "../output/cpm.49h.sid.csv")
+```
+

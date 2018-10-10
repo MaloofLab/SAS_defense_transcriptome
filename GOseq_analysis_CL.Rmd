@@ -1,0 +1,601 @@
+---
+title: "Goseq_analysis_CL_Julin's_way"
+output: html_document
+---
+
+```{r}
+library(goseq)
+```
+
+
+# to get the gene length from the reference file
+```{r}
+getwd()
+gene.lengths1 <- system("grep '>' ../reference/TAIR10_cdna_20110103_representative_gene_model_updated.1", intern = T)
+head(gene.lengths1)
+
+library(reshape2)
+#split by "|"
+gene.lengths1 <- colsplit(gene.lengths1, "\\|", names=c("gene_id", "symbol", "description", "length"))
+#split by " "
+gene.lengths2 <- colsplit(gene.lengths1$length, " ", names = c("nothing","position", "orientation", "length"))
+#split by "="
+gene.lengths3 <- colsplit(gene.lengths2$length, "=", names = c("ch", "length"))
+
+#creat an empty data frame
+gene.length <- data.frame(matrix(nrow = 33602, ncol = 2))
+gene.length$X1 <- gene.lengths1$gene_id
+gene.length$X2 <- gene.lengths3$length
+
+head(gene.length)
+
+colnames(gene.length) <- c("gene_id", "length")
+
+head(gene.length)
+
+gene.length$gene_id <- gsub(">", "", gene.length$gene_id)
+
+head(gene.length)
+
+gene.length$gene_id <- gsub("\\.\\d", "", gene.length$gene_id)
+
+head(gene.length)
+gene.length <- arrange(gene.length, gene_id) ##there is white space in the gene_id column, remove those
+gene.length$gene_id <- gsub(" ", "", gene.length$gene_id)
+gene.description <- data.frame(matrix(nrow = 33602, ncol = 2))
+gene.description$X1 <- gene.lengths1$gene_id
+gene.description$X2 <- gene.lengths1$description
+colnames(gene.description) <- c("gene_id", "description")
+
+head(gene.description)
+gene.description$gene_id <- gsub(">", "", gene.description$gene_id)
+
+head(gene.description)
+
+gene.description$gene_id <- gsub("\\.\\d", "", gene.description$gene_id)
+gene.description$gene_id <- gsub(" ", "", gene.description$gene_id)
+head(gene.description)
+```
+
+#import the go.terms
+
+```{r}
+go.terms <- read.delim("../reference/ATH_GO_GOSLIM.txt", header = F )
+head(go.terms)
+go.terms <- go.terms %>% select("V1", "V6")
+head(go.terms)
+colnames(go.terms) <- c("gene_id", "GO")
+head(go.terms)
+
+#let the gene which has many GOterms be together
+go.terms <- aggregate(go.terms[,2], list(go.terms[,1]), function(x) paste0(unique(x),collapse = ";"))
+head(go.terms)
+colnames(go.terms) <- c("gene_id", "GO")
+head(go.terms)
+```
+
+#import expressed genes 
+
+```{r}
+expressed.genes <- read_csv("../output/expressed_genes_counts.csv")
+expressed.genes <- expressed.genes$target_id
+expressed.genes <- as.data.frame(expressed.genes)
+head(expressed.genes)
+colnames(expressed.genes) <- "gene_id"
+expressed.genes$gene_id <- gsub("\\.\\d", "", expressed.genes$gene_id)
+head(expressed.genes)
+```
+
+```{r}
+#merge the expressed genes data with length
+
+expressed.genes.length <- merge(gene.length,expressed.genes, by="gene_id", all.y = T)
+
+#reduce the gene.length data to only contain entries for those genes in expressed.genes set. need this as a vector
+gene.lengths.vector <- gene.length$length[gene.length$gene_id %in% expressed.genes$gene_id]#subset the genelength data to retain the genes expressed in our experiment NOT subset. since it is a vector, not a list or dataframe
+names(gene.lengths.vector) <- gene.length$gene_id[gene.length$gene_id %in% expressed.genes$gene_id]
+head(gene.lengths.vector)# wow , vector!!!!!
+
+#Do the reverse to make sure everything matches up (no)
+expressed.genes.match <-as.data.frame(expressed.genes[expressed.genes$gene_id %in% names(gene.lengths.vector),]) 
+# is there any genes expressed, but not having gene length
+
+#why the expressed.genes.match is not a dataframe, it's dataframe in windows??
+colnames(expressed.genes.match) <- "gene_id"
+head(expressed.genes.match)
+
+# this is just to check if there is any gene without length, in my case ,all expressed genes have a length
+
+#and i found that it doesn't matter if it's a dataframe
+```
+
+#Format go.terms for goseq. We want them in list format, and we need to separate the terms into separate elements
+
+```{r}
+go.list <- strsplit(go.terms$GO,split=";")
+names(go.list) <- go.terms$gene_id
+head(go.list)
+```
+#Format gene expression data for goseq. We need a vector for each gene with 1 indicating differential expression and 0 indicating no differential expression.
+
+
+##import DEgene.Col.1h
+
+
+```{r}
+DEgene.Col.1h <- read.csv("../output/DEgenes.Col.1h.sep.csv")
+head(DEgene.Col.1h)
+colnames(DEgene.Col.1h)[1] <- "gene_id"
+head(DEgene.Col.1h)
+DEgene.Col.1h$gene_id <- gsub("\\.\\d", "", DEgene.Col.1h$gene_id)
+head(DEgene.Col.1h)
+```
+
+
+```{r}
+DE.Col.1h <- expressed.genes.match$gene_id %in% DEgene.Col.1h$gene_id
+    #for each gene in expressed gene, return FALSE if it is not in DEgene.trt and TRUE if it is.
+names(DE.Col.1h) <- expressed.genes.match$gene_id
+head(DE.Col.1h)
+DE.Col.1h <- as.numeric(DE.Col.1h) #convert to 0s and 1s
+head(DE.Col.1h)
+sum(DE.Col.1h) # number of DE genes
+```
+
+```{r}
+#determines if there is bias due to gene length.  The plot shows the relationship.
+nullp.result.Col <- nullp(DEgenes = DE.Col.1h,bias.data = gene.lengths.vector) # it seems like there is a relationship between the DE with  gene length!!!!!!!!
+
+#calculate p-values for each GO term
+rownames(nullp.result.Col) <- names(gene.lengths.vector) #because of a bug in nullp()
+GO.out.Col <- goseq(pwf = nullp.result.Col,gene2cat = go.list,test.cats=("GO:BP"))
+
+#list over-represented GO terms (p < 0.05)
+GO.out.Col[GO.out.Col$over_represented_pvalue < 0.05,]
+```
+
+```{r}
+#write.table(GO.out.Col[GO.out.Col$over_represented_pvalue < 0.05,1:2],row.names=FALSE,file="../output/GO_terms_Col_1h_rep.txt", quote = FALSE,col.names = FALSE)
+```
+
+
+##import DEgene.Col.49h
+
+
+```{r}
+DEgene.Col.49h <- read.csv("../output/DEgenes.Col.49h.sep.csv")
+head(DEgene.Col.49h)
+colnames(DEgene.Col.49h)[1] <- "gene_id"
+head(DEgene.Col.49h)
+DEgene.Col.49h$gene_id <- gsub("\\.\\d", "", DEgene.Col.49h$gene_id)
+head(DEgene.Col.49h)
+```
+
+
+```{r}
+DE.Col.49h <- expressed.genes.match$gene_id %in% DEgene.Col.49h$gene_id
+    #for each gene in expressed gene, return FALSE if it is not in DEgene.trt and TRUE if it is.
+names(DE.Col.49h) <- expressed.genes.match$gene_id
+head(DE.Col.49h)
+DE.Col.49h <- as.numeric(DE.Col.49h) #convert to 0s and 1s
+head(DE.Col.49h)
+sum(DE.Col.49h) # number of DE genes
+```
+
+```{r}
+#determines if there is bias due to gene length.  The plot shows the relationship.
+nullp.result.Col <- nullp(DEgenes = DE.Col.49h,bias.data = gene.lengths.vector) # it seems like there is a relationship between the DE with  gene length!!!!!!!!
+
+#calculate p-values for each GO term
+rownames(nullp.result.Col) <- names(gene.lengths.vector) #because of a bug in nullp()
+GO.out.Col <- goseq(pwf = nullp.result.Col,gene2cat = go.list,test.cats=("GO:BP"))
+
+#list over-represented GO terms (p < 0.05)
+GO.out.Col[GO.out.Col$over_represented_pvalue < 0.05,]
+```
+
+```{r}
+write.table(GO.out.Col[GO.out.Col$over_represented_pvalue < 0.05,1:2],row.names=FALSE,file="../output/GO_terms_Col_49h_rep.txt", quote = FALSE,col.names = FALSE)
+```
+
+#GOseq for shade up regulated genes in npr!
+
+##import only up regulated genes in npr
+
+```{r}
+shade1h.up.npr <- DEgene.npr.1h %>% filter(logFC.gtnpr > 0)
+head(shade1h.up.npr)
+```
+```{r}
+DE.npr.1h.up <- expressed.genes.match$gene_id %in% shade1h.up.npr$gene_id
+    #for each gene in expressed gene, return FALSE if it is not in DEgene.trt and TRUE if it is.
+names(DE.npr.1h.up) <- expressed.genes.match$gene_id
+head(DE.npr.1h.up)
+DE.npr.1h.up <- as.numeric(DE.npr.1h.up) #convert to 0s and 1s
+head(DE.npr.1h.up)
+sum(DE.npr.1h.up) # number of DE genes
+```
+
+```{r}
+#determines if there is bias due to gene length.  The plot shows the relationship.
+nullp.result.npr.up <- nullp(DEgenes = DE.npr.1h.up,bias.data = gene.lengths.vector) # it seems like there is a relationship between the DE with  gene length!!!!!!!!
+
+#calculate p-values for each GO term
+rownames(nullp.result.npr.up) <- names(gene.lengths.vector) #because of a bug in nullp()
+GO.out.npr.up <- goseq(pwf = nullp.result.npr.up,gene2cat = go.list,test.cats=("GO:BP"))
+
+#list over-represented GO terms (p < 0.05)
+GO.out.npr.up[GO.out.npr.up$over_represented_pvalue < 0.05,]
+```
+
+```{r}
+write.table(GO.out.npr.up[GO.out.npr.up$over_represented_pvalue < 0.05,1:2],row.names=FALSE,file="../output/GO_terms_npr_1hup_interaction.txt", quote = FALSE,col.names = FALSE)
+```
+
+##only up regulated genes in npr at 49h
+
+```{r}
+shade49h.up.npr <- DEgene.npr.49h %>% filter(logFC.gtnpr > 0)
+head(shade49h.up.npr)
+```
+```{r}
+DE.npr.49h.up <- expressed.genes.match$gene_id %in% shade49h.up.npr$gene_id
+    #for each gene in expressed gene, return FALSE if it is not in DEgene.trt and TRUE if it is.
+names(DE.npr.49h.up) <- expressed.genes.match$gene_id
+head(DE.npr.49h.up)
+DE.npr.49h.up <- as.numeric(DE.npr.49h.up) #convert to 0s and 1s
+head(DE.npr.49h.up)
+sum(DE.npr.49h.up) # number of DE genes
+```
+
+```{r}
+#determines if there is bias due to gene length.  The plot shows the relationship.
+nullp.result.npr.up <- nullp(DEgenes = DE.npr.49h.up,bias.data = gene.lengths.vector) # it seems like there is a relationship between the DE with  gene length!!!!!!!!
+
+#calculate p-values for each GO term
+rownames(nullp.result.npr.up) <- names(gene.lengths.vector) #because of a bug in nullp()
+GO.out.npr.up <- goseq(pwf = nullp.result.npr.up,gene2cat = go.list,test.cats=("GO:BP"))
+
+#list over-represented GO terms (p < 0.05)
+GO.out.npr.up[GO.out.npr.up$over_represented_pvalue < 0.05,]
+```
+
+```{r}
+write.table(GO.out.npr.up[GO.out.npr.up$over_represented_pvalue < 0.05,1:2],row.names=FALSE,file="../output/GO_terms_npr_49hup_interaction.txt", quote = FALSE,col.names = FALSE)
+```
+
+#GOseq for shade down regulated genes in npr!
+
+##import only down regulated genes in npr
+
+```{r}
+shade1h.down.npr <- DEgene.npr.1h %>% filter(logFC.gtnpr < 0)
+head(shade1h.down.npr)
+```
+```{r}
+DE.npr.1h.down <- expressed.genes.match$gene_id %in% shade1h.down.npr$gene_id
+    #for each gene in expressed gene, return FALSE if it is not in DEgene.trt and TRUE if it is.
+names(DE.npr.1h.down) <- expressed.genes.match$gene_id
+head(DE.npr.1h.down)
+DE.npr.1h.down <- as.numeric(DE.npr.1h.down) #convert to 0s and 1s
+head(DE.npr.1h.down)
+sum(DE.npr.1h.down) # number of DE genes
+```
+
+```{r}
+#determines if there is bias due to gene length.  The plot shows the relationship.
+nullp.result.npr.down <- nullp(DEgenes = DE.npr.1h.down,bias.data = gene.lengths.vector) # it seems like there is a relationship between the DE with  gene length!!!!!!!!
+
+#calculate p-values for each GO term
+rownames(nullp.result.npr.down) <- names(gene.lengths.vector) #because of a bug in nullp()
+GO.out.npr.down <- goseq(pwf = nullp.result.npr.down,gene2cat = go.list,test.cats=("GO:BP"))
+
+#list over-represented GO terms (p < 0.05)
+GO.out.npr.down[GO.out.npr.down$over_represented_pvalue < 0.05,]
+```
+
+```{r}
+write.table(GO.out.npr.down[GO.out.npr.down$over_represented_pvalue < 0.05,1:2],row.names=FALSE,file="../output/GO_terms_npr_1hdown_interaction.txt", quote = FALSE,col.names = FALSE)
+```
+
+##only down regulated genes in npr at 49h
+
+```{r}
+shade49h.down.npr <- DEgene.npr.49h %>% filter(logFC.gtnpr < 0)
+head(shade49h.down.npr)
+```
+```{r}
+DE.npr.49h.down <- expressed.genes.match$gene_id %in% shade49h.down.npr$gene_id
+    #for each gene in expressed gene, return FALSE if it is not in DEgene.trt and TRUE if it is.
+names(DE.npr.49h.down) <- expressed.genes.match$gene_id
+head(DE.npr.49h.down)
+DE.npr.49h.down <- as.numeric(DE.npr.49h.down) #convert to 0s and 1s
+head(DE.npr.49h.down)
+sum(DE.npr.49h.down) # number of DE genes
+```
+
+```{r}
+#determines if there is bias due to gene length.  The plot shows the relationship.
+nullp.result.npr.down <- nullp(DEgenes = DE.npr.49h.down,bias.data = gene.lengths.vector) # it seems like there is a relationship between the DE with  gene length!!!!!!!!
+
+#calculate p-values for each GO term
+rownames(nullp.result.npr.down) <- names(gene.lengths.vector) #because of a bug in nullp()
+GO.out.npr.down <- goseq(pwf = nullp.result.npr.down,gene2cat = go.list,test.cats=("GO:BP"))
+
+#list over-represented GO terms (p < 0.05)
+GO.out.npr.down[GO.out.npr.down$over_represented_pvalue < 0.05,]
+```
+
+```{r}
+write.table(GO.out.npr.down[GO.out.npr.down$over_represented_pvalue < 0.05,1:2],row.names=FALSE,file="../output/GO_terms_npr_49hdown_interaction.txt", quote = FALSE,col.names = FALSE)
+```
+
+##import DEgene.myc234.1h data
+```{r}
+DEgene.myc234.1h <- read.csv("../output/DEgenes.myc234.1h.csv")
+head(DEgene.myc234.1h)
+colnames(DEgene.myc234.1h)[1] <- "gene_id"
+head(DEgene.myc234.1h)
+DEgene.myc234.1h$gene_id <- gsub("\\.\\d", "", DEgene.myc234.1h$gene_id)
+head(DEgene.myc234.1h)
+```
+
+
+```{r}
+DE.myc234.1h <- expressed.genes.match$gene_id %in% DEgene.myc234.1h$gene_id
+    #for each gene in expressed gene, return FALSE if it is not in DEgene.trt and TRUE if it is.
+names(DE.myc234.1h) <- expressed.genes.match$gene_id
+head(DE.myc234.1h)
+DE.myc234.1h <- as.numeric(DE.myc234.1h) #convert to 0s and 1s
+head(DE.myc234.1h)
+sum(DE.myc234.1h) # number of DE genes
+```
+
+```{r}
+#determines if there is bias due to gene length.  The plot shows the relationship.
+nullp.result.myc234 <- nullp(DEgenes = DE.myc234.1h,bias.data = gene.lengths.vector) # it seems like there is a relationship between the DE with  gene length!!!!!!!!
+
+#calculate p-values for each GO term
+rownames(nullp.result.myc234) <- names(gene.lengths.vector) #because of a bug in nullp()
+GO.out.myc234 <- goseq(pwf = nullp.result.myc234,gene2cat = go.list,test.cats=("GO:BP"))
+
+#list over-represented GO terms (p < 0.05)
+GO.out.myc234[GO.out.myc234$over_represented_pvalue < 0.05,]
+```
+
+```{r}
+write.table(GO.out.myc234[GO.out.myc234$over_represented_pvalue < 0.05,1:2],row.names=FALSE,file="../output/GO_terms_myc234_1h_sep.txt", quote = FALSE,col.names = FALSE)
+```
+
+##import DEgene.npr.1h data
+```{r}
+DEgene.npr.1h <- read.csv("../output/DEgenes.npr.1h.csv")
+head(DEgene.npr.1h)
+colnames(DEgene.npr.1h)[1] <- "gene_id"
+head(DEgene.npr.1h)
+DEgene.npr.1h$gene_id <- gsub("\\.\\d", "", DEgene.npr.1h$gene_id)
+head(DEgene.npr.1h)
+```
+
+
+```{r}
+DE.npr.1h <- expressed.genes.match$gene_id %in% DEgene.npr.1h$gene_id
+    #for each gene in expressed gene, return FALSE if it is not in DEgene.trt and TRUE if it is.
+names(DE.npr.1h) <- expressed.genes.match$gene_id
+head(DE.npr.1h)
+DE.npr.1h <- as.numeric(DE.npr.1h) #convert to 0s and 1s
+head(DE.npr.1h)
+sum(DE.npr.1h) # number of DE genes
+```
+
+```{r}
+#determines if there is bias due to gene length.  The plot shows the relationship.
+nullp.result.npr <- nullp(DEgenes = DE.npr.1h,bias.data = gene.lengths.vector) # it seems like there is a relationship between the DE with  gene length!!!!!!!!
+
+#calculate p-values for each GO term
+rownames(nullp.result.npr) <- names(gene.lengths.vector) #because of a bug in nullp()
+GO.out.npr <- goseq(pwf = nullp.result.npr,gene2cat = go.list,test.cats=("GO:BP"))
+
+#list over-represented GO terms (p < 0.05)
+GO.out.npr[GO.out.npr$over_represented_pvalue < 0.05,]
+```
+
+```{r}
+write.table(GO.out.npr[GO.out.npr$over_represented_pvalue < 0.05,1:2],row.names=FALSE,file="../output/GO_terms_npr_1h_sep.txt", quote = FALSE,col.names = FALSE)
+```
+
+##import DEgene.sid.1h data
+```{r}
+DEgene.sid.1h <- read.csv("../output/DEgenes.sid.1h.csv")
+head(DEgene.sid.1h)
+colnames(DEgene.sid.1h)[1] <- "gene_id"
+head(DEgene.sid.1h)
+DEgene.sid.1h$gene_id <- gsub("\\.\\d", "", DEgene.sid.1h$gene_id)
+head(DEgene.sid.1h)
+```
+
+
+```{r}
+DE.sid.1h <- expressed.genes.match$gene_id %in% DEgene.sid.1h$gene_id
+    #for each gene in expressed gene, return FALSE if it is not in DEgene.trt and TRUE if it is.
+names(DE.sid.1h) <- expressed.genes.match$gene_id
+head(DE.sid.1h)
+DE.sid.1h <- as.numeric(DE.sid.1h) #convert to 0s and 1s
+head(DE.sid.1h)
+sum(DE.sid.1h) # number of DE genes
+```
+
+```{r}
+#determines if there is bias due to gene length.  The plot shows the relationship.
+nullp.result.sid <- nullp(DEgenes = DE.sid.1h,bias.data = gene.lengths.vector) # it seems like there is a relationship between the DE with  gene length!!!!!!!!
+
+#calculate p-values for each GO term
+rownames(nullp.result.sid) <- names(gene.lengths.vector) #because of a bug in nullp()
+GO.out.sid <- goseq(pwf = nullp.result.sid,gene2cat = go.list,test.cats=("GO:BP"))
+
+#list over-represented GO terms (p < 0.05)
+GO.out.sid[GO.out.sid$over_represented_pvalue < 0.05,]
+```
+
+```{r}
+write.table(GO.out.sid[GO.out.sid$over_represented_pvalue < 0.05,1:2],row.names=FALSE,file="../output/GO_terms_sid_1h_sep.txt", quote = FALSE,col.names = FALSE)
+```
+
+
+
+
+
+##import DEgene.myc234.49h data
+```{r}
+DEgene.myc234.49h <- read.csv("../output/DEgenes.myc234.49h.csv")
+head(DEgene.myc234.49h)
+colnames(DEgene.myc234.49h)[1] <- "gene_id"
+head(DEgene.myc234.49h)
+DEgene.myc234.49h$gene_id <- gsub("\\.\\d", "", DEgene.myc234.49h$gene_id)
+head(DEgene.myc234.49h)
+```
+
+
+```{r}
+DE.myc234.49h <- expressed.genes.match$gene_id %in% DEgene.myc234.49h$gene_id
+    #for each gene in expressed gene, return FALSE if it is not in DEgene.trt and TRUE if it is.
+names(DE.myc234.49h) <- expressed.genes.match$gene_id
+head(DE.myc234.49h)
+DE.myc234.49h <- as.numeric(DE.myc234.49h) #convert to 0s and 1s
+head(DE.myc234.49h)
+sum(DE.myc234.49h) # number of DE genes
+```
+
+```{r}
+#determines if there is bias due to gene length.  The plot shows the relationship.
+nullp.result.myc234 <- nullp(DEgenes = DE.myc234.49h,bias.data = gene.lengths.vector) # it seems like there is a relationship between the DE with  gene length!!!!!!!!
+
+#calculate p-values for each GO term
+rownames(nullp.result.myc234) <- names(gene.lengths.vector) #because of a bug in nullp()
+GO.out.myc234 <- goseq(pwf = nullp.result.myc234,gene2cat = go.list,test.cats=("GO:BP"))
+
+#list over-represented GO terms (p < 0.05)
+GO.out.myc234[GO.out.myc234$over_represented_pvalue < 0.05,]
+```
+
+```{r}
+write.table(GO.out.myc234[GO.out.myc234$over_represented_pvalue < 0.05,1:2],row.names=FALSE,file="../output/GO_terms_myc234_49h_sep.txt", quote = FALSE,col.names = FALSE)
+```
+
+##import DEgene.npr.49h data
+```{r}
+DEgene.npr.49h <- read.csv("../output/DEgenes.npr.49h.csv")
+head(DEgene.npr.49h)
+colnames(DEgene.npr.49h)[1] <- "gene_id"
+head(DEgene.npr.49h)
+DEgene.npr.49h$gene_id <- gsub("\\.\\d", "", DEgene.npr.49h$gene_id)
+head(DEgene.npr.49h)
+```
+
+
+```{r}
+DE.npr.49h <- expressed.genes.match$gene_id %in% DEgene.npr.49h$gene_id
+    #for each gene in expressed gene, return FALSE if it is not in DEgene.trt and TRUE if it is.
+names(DE.npr.49h) <- expressed.genes.match$gene_id
+head(DE.npr.49h)
+DE.npr.49h <- as.numeric(DE.npr.49h) #convert to 0s and 1s
+head(DE.npr.49h)
+sum(DE.npr.49h) # number of DE genes
+```
+
+```{r}
+#determines if there is bias due to gene length.  The plot shows the relationship.
+nullp.result.npr <- nullp(DEgenes = DE.npr.49h,bias.data = gene.lengths.vector) # it seems like there is a relationship between the DE with  gene length!!!!!!!!
+
+#calculate p-values for each GO term
+rownames(nullp.result.npr) <- names(gene.lengths.vector) #because of a bug in nullp()
+GO.out.npr <- goseq(pwf = nullp.result.npr,gene2cat = go.list,test.cats=("GO:BP"))
+
+#list over-represented GO terms (p < 0.05)
+GO.out.npr[GO.out.npr$over_represented_pvalue < 0.05,]
+```
+
+```{r}
+write.table(GO.out.npr[GO.out.npr$over_represented_pvalue < 0.05,1:2],row.names=FALSE,file="../output/GO_terms_npr_49h_sep.txt", quote = FALSE,col.names = FALSE)
+```
+
+##import DEgene.sid.49h data
+```{r}
+DEgene.sid.49h <- read.csv("../output/DEgenes.sid.49h.csv")
+head(DEgene.sid.49h)
+colnames(DEgene.sid.49h)[1] <- "gene_id"
+head(DEgene.sid.49h)
+DEgene.sid.49h$gene_id <- gsub("\\.\\d", "", DEgene.sid.49h$gene_id)
+head(DEgene.sid.49h)
+```
+
+
+```{r}
+DE.sid.49h <- expressed.genes.match$gene_id %in% DEgene.sid.49h$gene_id
+    #for each gene in expressed gene, return FALSE if it is not in DEgene.trt and TRUE if it is.
+names(DE.sid.49h) <- expressed.genes.match$gene_id
+head(DE.sid.49h)
+DE.sid.49h <- as.numeric(DE.sid.49h) #convert to 0s and 1s
+head(DE.sid.49h)
+sum(DE.sid.49h) # number of DE genes
+```
+
+```{r}
+#determines if there is bias due to gene length.  The plot shows the relationship.
+nullp.result.sid <- nullp(DEgenes = DE.sid.49h,bias.data = gene.lengths.vector) # it seems like there is a relationship between the DE with  gene length!!!!!!!!
+
+#calculate p-values for each GO term
+rownames(nullp.result.sid) <- names(gene.lengths.vector) #because of a bug in nullp()
+GO.out.sid <- goseq(pwf = nullp.result.sid,gene2cat = go.list,test.cats=("GO:BP"))
+
+#list over-represented GO terms (p < 0.05)
+GO.out.sid[GO.out.sid$over_represented_pvalue < 0.05,]
+```
+
+```{r}
+write.table(GO.out.sid[GO.out.sid$over_represented_pvalue < 0.05,1:2],row.names=FALSE,file="../output/GO_terms_sid_49h_sep.txt", quote = FALSE,col.names = FALSE)
+```
+
+
+# save deferentially expressed genes with description
+### merge with gene.description data
+```{r}
+DEgene.Col.1h.desc <- left_join(DEgene.Col.1h, gene.description, by="gene_id")
+DEgene.Col.1h.desc <- left_join(DEgene.Col.1h.desc, Description.merge, by=c("gene_id"="ID"))
+head(DEgene.Col.1h.desc)
+DEgene.Col.49h.desc <- left_join(DEgene.Col.49h, gene.description, by="gene_id")
+DEgene.Col.49h.desc <- left_join(DEgene.Col.49h.desc, Description.merge, by=c("gene_id"="ID"))
+head(DEgene.Col.49h.desc)
+DEgene.myc234.1h.desc <- left_join(DEgene.myc234.1h, gene.description, by="gene_id")
+DEgene.myc234.1h.desc <- left_join(DEgene.myc234.1h.desc, Description.merge, by=c("gene_id"="ID"))
+head(DEgene.myc234.1h.desc)
+DEgene.myc234.49h.desc <- left_join(DEgene.myc234.49h, gene.description, by="gene_id")
+DEgene.myc234.49h.desc <- left_join(DEgene.myc234.49h.desc, Description.merge, by=c("gene_id"="ID"))
+head(DEgene.myc234.49h.desc)
+DEgene.npr.1h.desc <- left_join(DEgene.npr.1h, gene.description, by="gene_id")
+DEgene.npr.1h.desc <- left_join(DEgene.npr.1h.desc, Description.merge, by=c("gene_id"="ID"))
+head(DEgene.npr.1h.desc)
+DEgene.npr.49h.desc <- left_join(DEgene.npr.49h, gene.description, by="gene_id")
+DEgene.npr.49h.desc <- left_join(DEgene.npr.49h.desc, Description.merge, by=c("gene_id"="ID"))
+head(DEgene.npr.49h.desc)
+DEgene.sid.1h.desc <- left_join(DEgene.sid.1h, gene.description, by="gene_id")
+DEgene.sid.1h.desc <- left_join(DEgene.sid.1h.desc, Description.merge, by=c("gene_id"="ID"))
+head(DEgene.sid.1h.desc)
+DEgene.sid.49h.desc <- left_join(DEgene.sid.49h, gene.description, by="gene_id")
+DEgene.sid.49h.desc <- left_join(DEgene.sid.49h.desc, Description.merge, by=c("gene_id"="ID"))
+head(DEgene.sid.49h.desc)
+```
+###save file as .csv
+
+```{r}
+
+write.csv(DEgene.Col.1h.desc, "../output/DEgene.Col.1h.desc.csv")
+write.csv(DEgene.Col.49h.desc, "../output/DEgene.Col.49h.desc.csv")
+write.csv(DEgene.myc234.1h.desc, "../output/DEgene.myc234.1h.desc.csv")
+write.csv(DEgene.myc234.49h.desc, "../output/DEgene.myc234.49h.desc.csv")
+write.csv(DEgene.npr.1h.desc, "../output/DEgene.npr.1h.desc.csv")
+write.csv(DEgene.npr.49h.desc, "../output/DEgene.npr.49h.desc.csv")
+write.csv(DEgene.sid.1h.desc, "../output/DEgene.sid.1h.desc.csv")
+write.csv(DEgene.sid.49h.desc, "../output/DEgene.sid.49h.desc.csv")
+```
+
