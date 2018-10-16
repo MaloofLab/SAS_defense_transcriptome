@@ -82,12 +82,12 @@ counts.data.spread <- counts.data %>%
 head(counts.data.spread)
 #save counts.data.spread 
 
-write.csv(counts.data.spread, file = "../output/total_counts_data.csv")
+#write.csv(counts.data.spread, file = "../output/total_counts_data.csv")
 
 # retain the genes with >10 reads in 3 samples
 # currently don't quite understand, but after removing these genes, the MDS plot looks better
 counts.data.spread <- counts.data.spread[rowSums(counts.data.spread[,-1] > 10) >= 3,]
-write.csv(counts.data.spread, file = "../output/expressed_genes_counts.csv")
+#write.csv(counts.data.spread, file = "../output/expressed_genes_counts.csv")
 head(counts.data.spread)
 ```
 
@@ -101,9 +101,9 @@ p <- pairs(counts.data.1000[ ,grep("Col", colnames(counts.data.1000))], log="xy"
 p
 
 #it's too large to show in the plot window, save first
-ggsave("plot_pair_sid_full.png",path=paste(getwd(),"../figures", sep = ""),pairs(counts.data.spread[ ,grep("sid", colnames(counts.data.spread))], log="xy"),width=20, height=20, units = "cm")
+#ggsave("plot_pair_sid_full.png",path=paste(getwd(),"../figures", sep = ""),pairs(counts.data.spread[ ,grep("sid", colnames(counts.data.spread))], log="xy"),width=20, height=20, units = "cm")
 
-cor(counts.data.spread[,6:9])
+#cor(counts.data.spread[,6:9])
 ```
 
 #assign groups
@@ -115,7 +115,7 @@ library(stringr)
 sample.description <- sample.description %>% 
   #This next line searches for genotypes in the colnames of counts.data.spread and returns anything that matches
   #In this way we can extract the genotype info.
-  mutate(gt=str_extract(sample,"Col|myc234|sid|sid")) %>%
+  mutate(gt=str_extract(sample,"Col|myc234|npr|sid")) %>%
   
   #Now we use the same method to get the treatment
   mutate(trt=str_extract(sample,"H|L")) %>%
@@ -131,7 +131,7 @@ sample.description
 #next convert gt and trt into group variables (factors)
 
 sample.description <- sample.description %>%
-  mutate(gt=factor(gt, levels = c("Col", "myc234", "sid", "sid")), 
+  mutate(gt=factor(gt, levels = c("Col", "myc234", "npr", "sid")), 
          trt=factor(trt,levels = c("H","L")),
          tp=factor(tp, levels = c("1h", "49h"))
          ) # setting the levels in this way makes "H" the refernce  
@@ -152,6 +152,8 @@ dge.data <- DGEList(counts=counts.matrix,
 dim(dge.data) 
 dge.data <- calcNormFactors(dge.data, method = "TMM")
 dge.data$samples # look at the normalization factors
+
+save(dge.data, file = file.path("..", "output", "dge.Rdata"))
 ```
 #make normalization factor plot
 
@@ -1004,4 +1006,6 @@ write.csv(cpm.npr.49h, "../output/cpm.49h.npr.csv")
 cpm.sid.49h <- cpm(dge.data.49h.sid)
 write.csv(cpm.sid.49h, "../output/cpm.49h.sid.csv")
 ```
+
+
 

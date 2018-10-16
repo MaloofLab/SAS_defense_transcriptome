@@ -11,7 +11,7 @@ library(ShortRead);library(goseq);library(GO.db);library("annotate")
 getwd()
 At_cdna<-Biostrings::readDNAStringSet("../reference/TAIR10_cdna_20110103_representative_gene_model_updated.1")
 At_cdna
-At_cdna$
+
 ```
 
 
@@ -346,6 +346,193 @@ GOseq.Atgoslim.BP.list.ORA(genelist=shade49h.down.sid$gene_id, expressed.genes =
 
 GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade49h.up.sid$gene_id, expressed.genes = expressed.genes)
 GOseq.Atgoslim.BP.list.ORA(ontology="CC",custom.category.list=Atgoslim.TAIR.CC.list, genelist=shade49h.down.sid$gene_id, expressed.genes = expressed.genes)
+```
+
+
+
+```{r}
+#this is the gene list for the shade regulated genes in different genotype, not consider the interaction
+DGE.OBJ1 <- list.files(path=file.path("..","output"), pattern = "\\.sep\\.csv")
+
+#this is the gene list for the differentially expressed genes in different genotype by using Col as reference
+DGE.OBJ2 <- list.files(path=file.path("..","output"), pattern = "^DEgenes\\.[^Col&].+h\\.csv")
+
+DEG.objs <- c(DGE.OBJ1, DGE.OBJ2)
+
+DEG.objs2 <- list.files(path=file.path("..","output"), pattern = ".rH\\.csv")
+```
+
+
+```{r}
+# read csv file
+DEG.list<-lapply(DEG.objs2, function(x) read_csv(paste(file.path("..","output"),"/",x,sep="")))
+names(DEG.list)<-gsub(".csv","",DEG.objs)
+DEG.list
+
+```
+
+```{r}
+# single coefficient
+names(DEG.list)
+```
+
+```{r}
+for(n in 1:8) {
+library(dplyr)
+  #genelist.up<-base::get(paste("../output/",DEG.objs.V1.5annotation.unique[n],sep="")) %>% rownames_to_column() %>%  dplyr::filter(logFC>0) # does not work
+    genelist.up<-DEG.list[[n]]  %>%  dplyr::filter(logFC>0)
+    genelist.down<-DEG.list[[n]] %>%  dplyr::filter(logFC<0)
+    GO.ORA.temp.up<-GOseq.Atgoslim.BP.list.ORA(gsub("\\.[[:digit:]]+", "", as_vector(genelist.up[,"X1"])),custom.category.list=Atgoslim.TAIR.BP.list, expressed.genes = expressed.genes) 
+    GO.ORA.temp.down<-GOseq.Atgoslim.BP.list.ORA(gsub("\\.[[:digit:]]+", "", as_vector(genelist.down[,"X1"])),custom.category.list=Atgoslim.TAIR.BP.list, expressed.genes = expressed.genes) 
+# handling "no enriched GO" 
+    # genelist.names<-c("GO.ORA.temp.up_down","GO.ORA.temp.down_up") # test
+    x<-list(GO.ORA.temp.up=GO.ORA.temp.up,
+            GO.ORA.temp.down=GO.ORA.temp.down) # list
+    x<-x[!x=="no enriched GO"] # reove "no enriched GO" result
+    ## add sample info and FC info and save GO.ORA result
+     if (length(x)!=0){ 
+    for (i in 1:length(x)) {
+        
+      GO.ORA.result<-x[[i]] %>% mutate(FC = gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),sample=DEG.objs[n])
+    save(GO.ORA.result,file=file.path("..","output",paste(gsub(".csv","",DEG.objs[n]),gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),"enrich.Rdata",sep=".")))
+    rm(GO.ORA.result)
+        
+    } 
+     }
+}
+```
+
+```{r}
+for(n in 9:14) {
+library(dplyr)
+  #genelist.up<-base::get(paste("../output/",DEG.objs.V1.5annotation.unique[n],sep="")) %>% rownames_to_column() %>%  dplyr::filter(logFC>0) # does not work
+      genelist.all<-DEG.list[[n]]
+#     DEG.list[[n]]  %>%  dplyr::select("logFC.genotypenpr1.1")
+#         DEG.list[[n]]  %>%  dplyr::select(logFC.genotypenpr1.1)
+# 
+#         DEG.list[[n]]  %>%  dplyr::select(names(DEG.list[[n]])[2]) %>% filter(.>0)
+#         DEG.list[[n]]  %>%  dplyr::filter(names(DEG.list[[n]])[2]>0)
+#         DEG.list[[n]]  %>%  dplyr::filter(logFC.genotypenpr1.1>0) # does work
+#         DEG.list[[n]]  %>%  dplyr::filter("logFC.genotypenpr1.1">0)
+#         DEG.list[[n]]  %>%  dplyr::filter(rlang::UQ("logFC.genotypenpr1.1")>0)
+#         DEG.list[[n]]  %>%  dplyr::filter(!!"logFC.genotypenpr1.1">0)
+#         DEG.list[[n]]  %>%  dplyr::filter(!!names(DEG.list[[n]])[2]>0)
+#         DEG.list[[n]]  %>%  dplyr::filter((!!names(DEG.list[[n]])[2])==3.26)
+#         DEG.list[[n]]  %>%  dplyr::filter((!!names(DEG.list[[n]])[2])<0)
+#         DEG.list[[n]]  %>%  dplyr::filter((UQ(as.name(names(DEG.list[[n]])[2])))>0) # works! See https://stackoverflow.com/questions/27197617/filter-data-frame-by-character-column-name-in-dplyr
+# DEG.list[[n]]  %>%  dplyr::filter((as.name(names(DEG.list[[n]])[2]))>0)  # does not work
+genelist.upup<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[2])))>0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))>0)
+    genelist.updown<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[2])))>0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))<0)
+        genelist.downup<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[2])))<0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))>0)
+    genelist.downdown<-  DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[2])))<0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))<0)
+    GO.ORA.temp.all<-GOseq.Atgoslim.BP.list.ORA(gsub("\\.[[:digit:]]+", "", as_vector(genelist.all[,"X1"])),custom.category.list=Atgoslim.TAIR.BP.list, expressed.genes = expressed.genes)
+    GO.ORA.temp.up_up<-GOseq.Atgoslim.BP.list.ORA(gsub("\\.[[:digit:]]+", "", as_vector(genelist.upup[,"X1"])),custom.category.list=Atgoslim.TAIR.BP.list, expressed.genes = expressed.genes)
+    GO.ORA.temp.up_down<-GOseq.Atgoslim.BP.list.ORA(gsub("\\.[[:digit:]]+", "", as_vector(genelist.updown[,"X1"])),custom.category.list=Atgoslim.TAIR.BP.list, expressed.genes = expressed.genes)
+    GO.ORA.temp.down_up<-GOseq.Atgoslim.BP.list.ORA(gsub("\\.[[:digit:]]+", "", as_vector(genelist.downup[,"X1"])),custom.category.list=Atgoslim.TAIR.BP.list, expressed.genes = expressed.genes)
+    GO.ORA.temp.down_down<-GOseq.Atgoslim.BP.list.ORA(gsub("\\.[[:digit:]]+", "", as_vector(genelist.downdown[,"X1"])),custom.category.list=Atgoslim.TAIR.BP.list, expressed.genes = expressed.genes)
+    # handling "no enriched GO" 
+    # genelist.names<-c("GO.ORA.temp.up_down","GO.ORA.temp.down_up") # test
+    x<-list(GO.ORA.temp.all=GO.ORA.temp.all,
+      GO.ORA.temp.up_up=GO.ORA.temp.up_up,
+            GO.ORA.temp.up_down=GO.ORA.temp.up_down,
+            GO.ORA.temp.down_up=GO.ORA.temp.down_up,
+            GO.ORA.temp.down_down=GO.ORA.temp.down_down) # list
+    print(x[x=="no enriched GO"])
+    x<-x[!x=="no enriched GO"] # reove "no enriched GO" result
+    if (length(x)!=0) {
+    ## add sample info and FC info and save GO.ORA result
+  for (i in 1:length(x)) {
+      GO.ORA.result<-x[[i]] %>% mutate(FC = gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),sample=DEG.objs[n])
+    save(GO.ORA.result,file=file.path("..","output",paste(gsub(".csv","",DEG.objs[n]),gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),"enrich.Rdata",sep=".")))
+    rm(GO.ORA.result)
+  }
+    }
+}
+```
+
+
+```{r}
+eGOseqs<-list.files(pattern="enrich.Rdata",path=file.path("..","output"))
+eGOseqs.list2<-sapply(file.path("..","output",eGOseqs),function(x) mget(load(x))) # mget will return the value of the object(or objects) in a list. see https://stackoverflow.com/questions/29398630/load-data-frames-into-list
+#names(eGOseqs.list2)
+eGOseqs.list2.summary<-do.call("rbind",eGOseqs.list2) 
+#head(eGOseqs.list2.summary) # make sure those are file names
+rownames(eGOseqs.list2.summary)<-1:nrow(eGOseqs.list2.summary)
+```
+
+```{r}
+library(scales)
+```
+
+```{r}
+# eGOseqs.list2.summary (more than three genes in each KO)
+eGOseqs.list2.summary<-eGOseqs.list2.summary[eGOseqs.list2.summary$numDEInCat>3,]
+# focused on only very significant GO terms
+eGOseqs.list2.summary<-eGOseqs.list2.summary[eGOseqs.list2.summary$over_represented_padjust<0.05,]
+# how to cluster GO Ontology according to this pattern?
+## using hclust to sort GO terms
+GO.list<-unique(eGOseqs.list2.summary$category)
+sample.list<-unique(eGOseqs.list2.summary$sample_FC) # revised
+# having x-label also used the x-label for df below
+eGOseqs.list2.summary <- eGOseqs.list2.summary %>% mutate(sample=gsub(".csv", "", sample)) %>% mutate(sample=gsub(".DEGs.int", "", sample)) %>% unite(sample_FC,sample,FC)
+
+# Making matrix for calculate hierarchical clustering of "over-representd_padjust" value using sperad
+df<-eGOseqs.list2.summary %>% dplyr::select(category,sample_FC,over_represented_padjust) %>% spread(sample_FC,over_represented_padjust,-1)
+
+df[df<1e-100]<-1e-100 # to avoid "Inf" after log10 transformation
+df<- df %>% mutate_at(vars(2:11) ,.funs=function(x) -log10(x))
+# df<- df %>% mutate_at(vars(2:11) ,.funs=-log10) # does not work
+df[is.na(df)]<-1
+df2<-df[,2:11]
+rownames(df2)<-df$category
+hc<-stats::hclust(dist(df2), "ave") # only numbers
+hc$order
+```
+
+```{r}
+hc.tib<-tibble(category=hc$labels,order=hc$order)
+# change term order using hclust() results
+hc.tib2<-hc.tib %>% inner_join(eGOseqs.list2.summary[,c("category","term")],by="category") %>% distinct() %>% arrange(desc(order))
+eGOseqs.list2.summary$term<-factor(eGOseqs.list2.summary$term,levels=as_vector(hc.tib2$term))
+# To avoid gray color, add 1e-20 to smaller padjust value
+eGOseqs.list2.summary$over_represented_padjust[eGOseqs.list2.summary$over_represented_padjust<1e-50]<-1e-50
+# format x label
+#eGOseqs.list2.summary <- eGOseqs.list2.summary  %>% mutate(sample2=str_replace(sample,"trt.density","trt_density")) %>%  separate(sample2,into=c("tissue","factor","DEGs","model","ref_density","ref_soil"),sep="\\.") %>% mutate(ref_soil=str_remove(ref_soil,"r")) %>% mutate(ref_density=str_remove(ref_density,"r"))  %>% unite(density_FC,ref_density,FC) # simplify elements in "density_FC" column for simpler x label in heatmap
+# plot
+  GOseq.plot<-ggplot(eGOseqs.list2.summary,aes(x=sample_FC,y=term)) + geom_tile(aes(fill=-log10(over_represented_padjust)),colour="black")  + scale_fill_gradient2(limit=c(0,50),low=muted("green"), high=muted("magenta")) # OK
+GOseq.plot<-GOseq.plot+     theme(axis.text.x=element_text(size=10,angle=90),
+          axis.text.y=element_text(size=10),
+          axis.title=element_text(size=10),
+          axis.ticks = element_blank(),
+          panel.background = element_rect(fill = "white",colour="black"),
+          plot.title=element_text(size=20),
+          axis.line=element_blank()) + labs(x="",y="",title="",fill="-log10\n pvalue")
+GOseq.plot
+
+ggsave(filename = "GO.enrich.heatmap.pdf", plot = GOseq.plot, path = "../output", height = 20, width = 20,units = "in")
+```
+
+
+#add description for defferetially expressed genes 
+```{r}
+head(Description.merge)
+head (gene.description)
+DEG.objs
+DEG.list.desc <- DEG.list
+names(DEG.list.desc) <- c("DEgenes.Col.1h.rH","DEgenes.Col.49h.rH","DEgenes.myc234.1h.rH","DEgenes.myc234.49h.rH","DEgenes.npr.1h.rH","DEgenes.npr.49h.rH","DEgenes.sid.1h.rH","DEgenes.sid.49h.rH", "DEgenes.myc234.1h.rCol.rH", "DEgenes.myc234.49h.rCol.rH","DEgenes.npr.1h.rCol.rH","DEgenes.npr.49h.rCol.rH","DEgenes.sid.1h.rCol.rH","DEgenes.sid.49h.rCol.rH")
+
+test
+```
+
+
+```{r}
+for(n in 1:14){
+  test <- DEG.list.desc[[n]]
+  colnames(test)[1] <- "gene_id"
+    test$gene_id <- gsub("\\.[[:digit:]]+", "", test$gene_id)
+    test <- left_join(test, Description.merge, by = "gene_id")
+    write.csv(test, file=file.path("../output",paste(names(DEG.list.desc)[n],"csv",sep=".")))
+    }
 ```
 
 

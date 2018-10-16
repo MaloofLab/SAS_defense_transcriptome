@@ -1,0 +1,111 @@
+---
+title: "2013_data"
+output: html_document
+---
+
+```{r}
+library(goseq)
+library(tidyverse)
+library(readxl)
+```
+
+
+```{r}
+genes.2013 <- readxl::read_excel("../Scbweizer_2013_data/tpc115139SupplementalDS1.xlsx", skip = 4)
+head(genes.2013)
+```
+
+```{r}
+DEgenes.2013.rCol <- genes.2013 %>% filter(adj.P.Val<0.05)
+DEgenes.2013.rCol$`AGI Code` <- toupper(DEgenes.2013.rCol$`AGI Code`)
+DEgenes.2013.rCol
+```
+
+```{r}
+
+```
+
+```{r}
+library(ShortRead);library(goseq);library(GO.db);library("annotate")
+```
+
+
+```{r}
+getwd()
+At_cdna<-Biostrings::readDNAStringSet("../reference/TAIR10_cdna_20110103_representative_gene_model_updated.1")
+At_cdna
+
+```
+
+
+```{r}
+Atgoslim.TAIR<-read_tsv("../reference/ATH_GO_GOSLIM.txt",skip=2,col_names = FALSE )
+```
+
+```{r}
+head(Atgoslim.TAIR)
+Atgoslim.TAIR %>% filter(X8=="P",X1=="AT4G38360") %>% dplyr::select(1,5,6,8,9,10)###what does this mean? means BP  biological process
+Atgoslim.TAIR.BP <-Atgoslim.TAIR%>% filter(X8=="P")
+head(Atgoslim.TAIR.BP)
+Atgoslim.TAIR.BP.list<-tapply(Atgoslim.TAIR.BP$X6,Atgoslim.TAIR.BP$X1,c)
+head(Atgoslim.TAIR.BP.list)
+#save(Atgoslim.TAIR.BP.list, list,file=file.path("../output","Atgoslim.TAIR.BP.list.Rdata"))
+
+Atgoslim.TAIR.CC <-Atgoslim.TAIR%>% filter(X8=="C")
+head(Atgoslim.TAIR.CC)
+Atgoslim.TAIR.CC.list<-tapply(Atgoslim.TAIR.CC$X6,Atgoslim.TAIR.CC$X1,c)
+head(Atgoslim.TAIR.CC.list)
+#save(Atgoslim.TAIR.CC.list, list,file=file.path("../output","Atgoslim.TAIR.CC.list.Rdata"))
+```
+
+```{r}
+GOseq.Atgoslim.BP.list.ORA<-function(genelist,padjust=0.05,ontology="BP",custom.category.list=Atgoslim.TAIR.BP.list,cdna=At_cdna) { # return GO enrichment table, padjus, padjust=0.05. 
+  bias<-nchar(cdna)#to get the length of each gene
+  names(bias)<-tibble(AGI=names(cdna)) %>% separate(AGI,into="AGI2",pattern="|",extra="drop") %>% dplyr::select(AGI2) %>% as_vector()# to get the AGI of each gene
+  table(duplicated(names(bias)))# to see if there is duplicated AGI
+  #TF<-(names(bias) %in% genelist)*1
+  #bias <- bias[names(bias)%in%expressed.genes$gene_id] # use only expressed genes in the experiment as reference
+  TF<-as.integer(names(bias) %in% genelist)
+  names(TF)<-names(bias)
+  #print(TF)
+  pwf<-nullp(TF,bias.data=bias)
+  #print(pwf$DEgenes)
+  GO.pval <- goseq(pwf,gene2cat=custom.category.list,use_genes_without_cat=TRUE) # format became different in new goseq version (021111). Does not work (042716)
+  #head(GO.pval) 
+  if(ontology=="BP") {
+    GO.pval2<-subset(GO.pval,ontology=="BP")
+  } else if(ontology=="CC") {
+    GO.pval2<-subset(GO.pval,ontology=="CC")
+  } else {
+    GO.pval2<-subset(GO.pval,ontology=="MF")
+  }
+  # calculating padjust by BH  
+  GO.pval2$over_represented_padjust<-p.adjust(GO.pval2$over_represented_pvalue,method="BH")
+  if(GO.pval2$over_represented_padjust[1]>padjust) return("no enriched GO")
+  else {
+    enriched.GO<-GO.pval2[GO.pval2$over_represented_padjust<padjust,] 
+    print("enriched.GO is")
+    print(enriched.GO)
+    
+    ## write Term and Definition 
+    for(i in 1:dim(enriched.GO)[1]) {
+      if(is.null(Term(GOTERM[enriched.GO[i,"category"]]))) {next} else {
+      enriched.GO$Term[i]<-Term(GOTERM[[enriched.GO[i,"category"]]])
+      enriched.GO$Definition[i]<-Definition(GOTERM[[enriched.GO[i,"category"]]])
+      }
+    }
+    return(enriched.GO)
+  }
+}
+
+```
+
+
+```{r}
+down <- DEgenes.2013.rCol %>% filter(`Col-0/myc234` > 1)
+up <- DEgenes.2013.rCol %>% filter(`Col-0/myc234` < 1)
+GOseq.Atgoslim.BP.list.ORA(up$`AGI Code`,custom.category.list=Atgoslim.TAIR.BP.list)
+GOseq.Atgoslim.BP.list.ORA(down$`AGI Code`,custom.category.list=Atgoslim.TAIR.BP.list)
+
+```
+

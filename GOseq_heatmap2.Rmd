@@ -1,0 +1,309 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r}
+library(ShortRead);library(goseq);library(GO.db);library("annotate")
+```
+
+
+```{r}
+getwd()
+At_cdna<-Biostrings::readDNAStringSet("../reference/TAIR10_cdna_20110103_representative_gene_model_updated.1")
+At_cdna
+
+```
+
+
+```{r}
+Atgoslim.TAIR<-read_tsv("../reference/ATH_GO_GOSLIM.txt",skip=2,col_names = FALSE )
+```
+```{r}
+load("../reference/At.hormone.responsive.list.Rdata")
+head(At.hormone.responsive.list)
+```
+
+
+```{r}
+head(Atgoslim.TAIR)
+Atgoslim.TAIR %>% filter(X8=="P",X1=="AT4G38360") %>% dplyr::select(1,5,6,8,9,10)###what does this mean? means BP  biological process
+Atgoslim.TAIR.BP <-Atgoslim.TAIR%>% filter(X8=="P")
+head(Atgoslim.TAIR.BP)
+Atgoslim.TAIR.BP.list<-tapply(Atgoslim.TAIR.BP$X6,Atgoslim.TAIR.BP$X1,c)
+head(Atgoslim.TAIR.BP.list)
+#save(Atgoslim.TAIR.BP.list, list,file=file.path("../output","Atgoslim.TAIR.BP.list.Rdata"))
+
+Atgoslim.TAIR.CC <-Atgoslim.TAIR%>% filter(X8=="C")
+head(Atgoslim.TAIR.CC)
+Atgoslim.TAIR.CC.list<-tapply(Atgoslim.TAIR.CC$X6,Atgoslim.TAIR.CC$X1,c)
+head(Atgoslim.TAIR.CC.list)
+#save(Atgoslim.TAIR.CC.list, list,file=file.path("../output","Atgoslim.TAIR.CC.list.Rdata"))
+```
+#import expressed genes 
+
+```{r}
+expressed.genes <- read_csv("../output/expressed_genes_counts.csv")
+expressed.genes <- expressed.genes$target_id
+expressed.genes <- as.data.frame(expressed.genes)
+head(expressed.genes)
+colnames(expressed.genes) <- "gene_id"
+expressed.genes$gene_id <- gsub("\\.\\d", "", expressed.genes$gene_id)
+head(expressed.genes)
+```
+
+
+
+```{r}
+GOseq.Atgoslim.BP.list.ORA<-function(genelist,padjust=0.05,ontology="BP",custom.category.list=Atgoslim.TAIR.BP.list,cdna=At_cdna,expressed.genes=expressed.genes) { # return GO enrichment table, padjus, padjust=0.05. 
+  bias<-nchar(cdna)#to get the length of each gene
+  names(bias)<-tibble(AGI=names(cdna)) %>% separate(AGI,into="AGI2",pattern="|",extra="drop") %>% dplyr::select(AGI2) %>% as_vector()# to get the AGI of each gene
+  table(duplicated(names(bias)))# to see if there is duplicated AGI
+  #TF<-(names(bias) %in% genelist)*1
+  bias <- bias[names(bias)%in%expressed.genes$gene_id] # use only expressed genes in the experiment as reference
+  TF<-as.integer(names(bias) %in% genelist)
+  names(TF)<-names(bias)
+  #print(TF)
+  pwf<-nullp(TF,bias.data=bias)
+  #print(pwf$DEgenes)
+  GO.pval <- goseq(pwf,gene2cat=custom.category.list,use_genes_without_cat=TRUE) # format became different in new goseq version (021111). Does not work (042716)
+  #head(GO.pval) 
+  if(ontology=="BP") {
+    GO.pval2<-subset(GO.pval,ontology=="BP")
+  } else if(ontology=="CC") {
+    GO.pval2<-subset(GO.pval,ontology=="CC")
+  } else {
+    GO.pval2<-subset(GO.pval,ontology=="MF")
+  }
+  # calculating padjust by BH  
+  GO.pval2$over_represented_padjust<-p.adjust(GO.pval2$over_represented_pvalue,method="BH")
+  if(GO.pval2$over_represented_padjust[1]>padjust) return("no enriched GO")
+  else {
+    enriched.GO<-GO.pval2[GO.pval2$over_represented_padjust<padjust,] 
+    print("enriched.GO is")
+    print(enriched.GO)
+    
+    ## write Term and Definition 
+    for(i in 1:dim(enriched.GO)[1]) {
+      if(is.null(Term(GOTERM[enriched.GO[i,"category"]]))) {next} else {
+      enriched.GO$Term[i]<-Term(GOTERM[[enriched.GO[i,"category"]]])
+      enriched.GO$Definition[i]<-Definition(GOTERM[[enriched.GO[i,"category"]]])
+      }
+    }
+    return(enriched.GO)
+  }
+}
+
+```
+
+
+```{r}
+DEG.objs2 <- list.files(path=file.path("..","output"), pattern = ".rH\\.csv")
+```
+
+
+```{r}
+# read csv file
+DEG.list<-lapply(DEG.objs2, function(x) read_csv(paste(file.path("..","output"),"/",x,sep="")))
+names(DEG.list)<-gsub(".csv","",DEG.objs2)
+
+
+```
+
+```{r}
+# single coefficient
+names(DEG.list)
+```
+
+
+#for double coeffecient, use only genotype coefficient
+
+only use the genotype FC 
+```{r}
+for(n in c(1,2,3,5)) {
+library(dplyr)
+  
+genelist.up<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))>0)
+genelist.down<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))<0)
+    GO.ORA.temp.up<-GOseq.Atgoslim.BP.list.ORA(gsub("\\.[[:digit:]]+", "", as_vector(genelist.up[,"gene_id"])),custom.category.list=Atgoslim.TAIR.BP.list, expressed.genes = expressed.genes)
+    GO.ORA.temp.down<-GOseq.Atgoslim.BP.list.ORA(gsub("\\.[[:digit:]]+", "", as_vector(genelist.down[,"gene_id"])),custom.category.list=Atgoslim.TAIR.BP.list, expressed.genes = expressed.genes)
+    # handling "no enriched GO" 
+    # genelist.names<-c("GO.ORA.temp.up_down","GO.ORA.temp.down_up") # test
+    x<-list(GO.ORA.temp.up=GO.ORA.temp.up,
+            GO.ORA.temp.down=GO.ORA.temp.down) # list
+    print(x[x=="no enriched GO"])
+    x<-x[!x=="no enriched GO"] # reove "no enriched GO" result
+    if (length(x)!=0) {
+    ## add sample info and FC info and save GO.ORA result
+  for (i in 1:length(x)) {
+      GO.ORA.result<-x[[i]] %>% mutate(FC = gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),sample=DEG.objs2[n])
+    save(GO.ORA.result,file=file.path("..","output",paste(gsub(".csv","",DEG.objs2[n]),gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),"single.coef.enrich.myc.Rdata",sep=".")))
+    rm(GO.ORA.result)
+  }
+    }
+}
+```
+
+
+
+```{r}
+eGOseqs<-list.files(pattern="single.coef.enrich.Rdata",path=file.path("..", "output"))
+eGOseqs.list2<-sapply(file.path("..","output",eGOseqs),function(x) mget(load(x))) # mget will return the value of the object(or objects) in a list. see https://stackoverflow.com/questions/29398630/load-data-frames-into-list
+#names(eGOseqs.list2)
+eGOseqs.list2.summary<-do.call("rbind",eGOseqs.list2) 
+#head(eGOseqs.list2.summary) # make sure those are file names
+rownames(eGOseqs.list2.summary)<-1:nrow(eGOseqs.list2.summary)
+```
+
+```{r}
+library(scales)
+```
+
+```{r}
+# eGOseqs.list2.summary (more than three genes in each KO)
+eGOseqs.list2.summary<-eGOseqs.list2.summary[eGOseqs.list2.summary$numDEInCat>3,]
+# focused on only very significant GO terms
+eGOseqs.list2.summary<-eGOseqs.list2.summary[eGOseqs.list2.summary$over_represented_padjust<0.05,]
+# how to cluster GO Ontology according to this pattern?
+## using hclust to sort GO terms
+GO.list<-unique(eGOseqs.list2.summary$category)
+sample.list<-unique(eGOseqs.list2.summary$sample_FC) # revised
+# having x-label also used the x-label for df below
+eGOseqs.list2.summary <- eGOseqs.list2.summary %>% mutate(sample=gsub(".csv", "", sample)) %>% mutate(sample=gsub(".DEGs.int", "", sample)) %>% unite(sample_FC,sample,FC)
+
+# Making matrix for calculate hierarchical clustering of "over-representd_padjust" value using sperad
+df<-eGOseqs.list2.summary %>% dplyr::select(category,sample_FC,over_represented_padjust) %>% spread(sample_FC,over_represented_padjust,-1)
+
+df[df<1e-100]<-1e-100 # to avoid "Inf" after log10 transformation
+df<- df %>% mutate_at(vars(2:6) ,.funs=function(x) -log10(x))
+# df<- df %>% mutate_at(vars(2:11) ,.funs=-log10) # does not work
+df[is.na(df)]<-1
+df2<-df[,2:6]
+rownames(df2)<-df$category
+hc<-stats::hclust(dist(df2), "ave") # only numbers
+hc$order
+```
+
+```{r}
+hc.tib<-tibble(category=hc$labels,order=hc$order)
+# change term order using hclust() results
+hc.tib2<-hc.tib %>% inner_join(eGOseqs.list2.summary[,c("category","term")],by="category") %>% distinct() %>% arrange(desc(order))
+eGOseqs.list2.summary$term<-factor(eGOseqs.list2.summary$term,levels=as_vector(hc.tib2$term))
+# To avoid gray color, add 1e-20 to smaller padjust value
+eGOseqs.list2.summary$over_represented_padjust[eGOseqs.list2.summary$over_represented_padjust<1e-50]<-1e-50
+# format x label
+#eGOseqs.list2.summary <- eGOseqs.list2.summary  %>% mutate(sample2=str_replace(sample,"trt.density","trt_density")) %>%  separate(sample2,into=c("tissue","factor","DEGs","model","ref_density","ref_soil"),sep="\\.") %>% mutate(ref_soil=str_remove(ref_soil,"r")) %>% mutate(ref_density=str_remove(ref_density,"r"))  %>% unite(density_FC,ref_density,FC) # simplify elements in "density_FC" column for simpler x label in heatmap
+# plot
+  GOseq.plot<-ggplot(eGOseqs.list2.summary,aes(x=sample_FC,y=term)) + geom_tile(aes(fill=-log10(over_represented_padjust)),colour="black")  + scale_fill_gradient2(limit=c(0,50),low=muted("green"), high=muted("magenta")) # OK
+GOseq.plot<-GOseq.plot+     theme(axis.text.x=element_text(size=10,angle=90),
+          axis.text.y=element_text(size=10),
+          axis.title=element_text(size=10),
+          axis.ticks = element_blank(),
+          panel.background = element_rect(fill = "white",colour="black"),
+          plot.title=element_text(size=20),
+          axis.line=element_blank()) + labs(x="",y="",title="",fill="-log10\n pvalue")
+GOseq.plot
+
+ggsave(filename = "GO.enrich.heatmap.single.coef.myc.pdf", plot = GOseq.plot, path = "../output", height = 10, width = 10,units = "in")
+```
+
+# use hormone responsive genes for goseq analysis
+
+```{r}
+for(n in c(1,2,3,5)) {
+library(dplyr)
+  
+genelist.up<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))>0)
+genelist.down<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))<0)
+    GO.ORA.temp.up<-GOseq.Atgoslim.BP.list.ORA(gsub("\\.[[:digit:]]+", "", as_vector(genelist.up[,"gene_id"])),custom.category.list=Atgoslim.TAIR.BP.list, expressed.genes = expressed.genes)
+    GO.ORA.temp.down<-GOseq.Atgoslim.BP.list.ORA(gsub("\\.[[:digit:]]+", "", as_vector(genelist.down[,"gene_id"])),custom.category.list=Atgoslim.TAIR.BP.list, expressed.genes = expressed.genes)
+    # handling "no enriched GO" 
+    # genelist.names<-c("GO.ORA.temp.up_down","GO.ORA.temp.down_up") # test
+    x<-list(GO.ORA.temp.up=GO.ORA.temp.up,
+            GO.ORA.temp.down=GO.ORA.temp.down) # list
+    print(x[x=="no enriched GO"])
+    x<-x[!x=="no enriched GO"] # reove "no enriched GO" result
+    if (length(x)!=0) {
+    ## add sample info and FC info and save GO.ORA result
+  for (i in 1:length(x)) {
+      GO.ORA.result<-x[[i]] %>% mutate(FC = gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),sample=DEG.objs2[n])
+    save(GO.ORA.result,file=file.path("..","output",paste(gsub(".csv","",DEG.objs2[n]),gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),"single.coef.enrich.myc.Rdata",sep=".")))
+    rm(GO.ORA.result)
+  }
+    }
+}
+```
+
+```{r}
+ # bias.data vector must have the same length as DEgenes vector! 
+## if you want to test expressed genes as background, add background in this function
+GOseq.At.customcat.ORA<-function(genelist,padjust=0.05,custom.category.list=At.hormone.responsive.list,cdna=At_cdna,background="") { # return GO enrichment table, padjus, padjust=0.05. New BLAST2GO results with only BP Brgo.v2.5.BP.list is used (042518). Brgo.v2.5.BP.list is based on Hajar's Blast2go, which should be replaced with Brgo.Atgoslim.BP.list and giving a new name to this function (080818). cdna is DNAstring object. background is a vector of genes.
+  #bias<-nchar(cdna)
+  bias<-Biostrings::width(cdna)
+  # add name to "bias". cdna
+  #names(bias)<-names(cdna)
+ names(bias) <- tibble(name=names(cdna)) %>% separate(name,into=c("name2","Symbol","description"),sep=" \\|",extra="drop",fill="left") %>%  mutate(AGI=str_remove(name2,pattern="\\.[[:digit:]]+")) %>% pull(AGI)
+ if(background=="") {print("Use all genes in genome as background")} else {
+ # select only expressed geens 
+  bias <- bias[background]
+  print("Expessed genes are used as background.")
+  print(paste("length of bias is ",length(bias)))
+ }
+  TF<-(names(bias) %in% genelist)*1
+  names(TF)<-names(bias)
+  #print(TF)
+  pwf<-nullp(TF,bias.data=bias)
+  #print(pwf$DEgenes)
+  GO.pval <- goseq(pwf,gene2cat=custom.category.list,use_genes_without_cat=TRUE) # format became different in new goseq version (021111). Does not work (042716)
+  # calculate p ajust by BH
+  GO.pval$over_represented_padjust<-p.adjust(GO.pval$over_represented_pvalue,method="BH")
+  if(GO.pval$over_represented_padjust[1]>padjust) return("no enriched GO")
+  else {
+    enriched.GO<-GO.pval[GO.pval$over_represented_padjust<padjust,] 
+    print("enriched.GO is")
+    print(enriched.GO)
+    return(enriched.GO)
+  }
+}
+```
+
+```{r}
+up <- 
+```
+
+```{r}
+GOseq.At.customcat.ORA(genelist=, background="expressed.genes")
+```
+
+
+```{r}
+DEG.list
+```
+
+```{r}
+genes.in.enriched.category<-function(enrich.result,gene.list,category.table=Atgoslim.TAIR.BP.list) { # return data frame with all input data with ... which format is good? VennDiagram input format?  
+  enrich.category<-enrich.result[enrich.result$over_represented_pvalue<0.05,"category"]
+  temp<-category.table[gene.list] # short category.table for enriched.result # gene.list shas to be character (not factor)  
+  #names(temp[!is.na(names(temp))])
+  temp<-temp[!is.na(names(temp))] # remove non matched AGI
+  test<-data.frame(AGI=names(temp))
+  for(i in enrich.category) {
+    x<-rep(0,length(names(temp)))
+    x[grep(i,temp)]<-1
+    test<-cbind(test,x)
+    names(test)[dim(test)[2]]<-i
+  }
+  return(test) 
+}
+```
+
+```{r}
+names(eGOseqs.list2)
+```
+
+
+```{r}
+results.table<-genes.in.enriched.category(enrich.result=eGOseqs.list2[[2]],gene.list=gsub("(.)(\\.[[:digit:]]+)","\\1",DEG.list[[2]]$gene_id))
+results.table[1:10,1:10]
+```
+
