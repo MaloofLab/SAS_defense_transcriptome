@@ -98,7 +98,7 @@ GOseq.Atgoslim.BP.list.ORA<-function(genelist,padjust=0.05,ontology="BP",custom.
 
 
 ```{r}
-DEG.objs2 <- list.files(path=file.path("..","output"), pattern = ".rH\\.csv")
+DEG.objs2 <- list.files(path=file.path("..","output"), pattern = ".rH\\.csv")[c(1,2,3,5)]
 ```
 
 
@@ -113,6 +113,7 @@ names(DEG.list)<-gsub(".csv","",DEG.objs2)
 ```{r}
 # single coefficient
 names(DEG.list)
+
 ```
 
 
@@ -120,7 +121,7 @@ names(DEG.list)
 
 only use the genotype FC 
 ```{r}
-for(n in c(1,2,3,5)) {
+for(n in c(1:4)) {
 library(dplyr)
   
 genelist.up<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))>0)
@@ -137,7 +138,7 @@ genelist.down<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[
     ## add sample info and FC info and save GO.ORA result
   for (i in 1:length(x)) {
       GO.ORA.result<-x[[i]] %>% mutate(FC = gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),sample=DEG.objs2[n])
-    save(GO.ORA.result,file=file.path("..","output",paste(gsub(".csv","",DEG.objs2[n]),gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),"single.coef.enrich.myc.Rdata",sep=".")))
+    save(GO.ORA.result,file=file.path("..","output",paste(gsub(".csv","",DEG.objs2[n]),gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),"single.coef.enrich.Rdata",sep=".")))
     rm(GO.ORA.result)
   }
     }
@@ -147,7 +148,7 @@ genelist.down<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[
 
 
 ```{r}
-eGOseqs<-list.files(pattern="single.coef.enrich.Rdata",path=file.path("..", "output"))
+eGOseqs<-list.files(pattern="single.coef.enrich.Rdata",path=file.path("..", "output"))[c(1:6)]
 eGOseqs.list2<-sapply(file.path("..","output",eGOseqs),function(x) mget(load(x))) # mget will return the value of the object(or objects) in a list. see https://stackoverflow.com/questions/29398630/load-data-frames-into-list
 #names(eGOseqs.list2)
 eGOseqs.list2.summary<-do.call("rbind",eGOseqs.list2) 
@@ -158,7 +159,7 @@ rownames(eGOseqs.list2.summary)<-1:nrow(eGOseqs.list2.summary)
 ```{r}
 library(scales)
 ```
-
+#plot
 ```{r}
 # eGOseqs.list2.summary (more than three genes in each KO)
 eGOseqs.list2.summary<-eGOseqs.list2.summary[eGOseqs.list2.summary$numDEInCat>3,]
@@ -183,7 +184,7 @@ rownames(df2)<-df$category
 hc<-stats::hclust(dist(df2), "ave") # only numbers
 hc$order
 ```
-
+#plot
 ```{r}
 hc.tib<-tibble(category=hc$labels,order=hc$order)
 # change term order using hclust() results
@@ -206,33 +207,163 @@ GOseq.plot
 
 ggsave(filename = "GO.enrich.heatmap.single.coef.myc.pdf", plot = GOseq.plot, path = "../output", height = 10, width = 10,units = "in")
 ```
+#find out genes in each GO
+
+```{r}
+genes.in.enriched.category<-function(enrich.result,gene.list,category.table=Atgoslim.TAIR.BP.list) { # return data frame with all input data with ... which format is good? VennDiagram input format?  
+  enrich.category<-enrich.result[enrich.result$over_represented_padjust<0.05,"category"]
+  temp<-category.table[gene.list] # short category.table for enriched.result # gene.list shas to be character (not factor)  
+  #names(temp[!is.na(names(temp))])
+  temp<-temp[!is.na(names(temp))] # remove non matched AGI
+  test<-data.frame(AGI=names(temp))
+  for(i in enrich.category) {
+    x<-rep(0,length(names(temp)))
+    x[grep(i,temp)]<-1
+    test<-cbind(test,x)
+    names(test)[dim(test)[2]]<-i
+  }
+  return(test) 
+}
+```
+
+```{r}
+names(eGOseqs.list2) <- gsub("../output/DEgenes.", "", names(eGOseqs.list2))
+names(eGOseqs.list2) <- gsub("\\.single.+", "", names(eGOseqs.list2))
+names(eGOseqs.list2)
+```
+
+```{r}
+names(DEG.list)
+```
+
+
+```{r}
+
+names(eGOseqs.list2)[1]
+names(DEG.list)[1]
+#up
+
+results.table<-genes.in.enriched.category(enrich.result=eGOseqs.list2[[1]],gene.list=gsub("(.)(\\.[[:digit:]]+)","\\1",(DEG.list[[1]] %>% filter(DEG.list[[1]][3]>0))$gene_id))
+
+for(i in 2:ncol(results.table)) {
+  temp <- results.table %>% filter(results.table[,i]==1) %>% dplyr::select(AGI)
+write.csv(temp, file = file.path("../output", paste(names(eGOseqs.list2)[1], colnames(results.table)[i],"enriched.csv", sep = ".")))
+}
+```
+
+```{r}
+
+names(eGOseqs.list2)[2]
+names(DEG.list)[2]
+#up
+results.table<-genes.in.enriched.category(enrich.result=eGOseqs.list2[[2]],gene.list=gsub("(.)(\\.[[:digit:]]+)","\\1",(DEG.list[[2]] %>% filter(DEG.list[[2]][3]>0))$gene_id))
+
+for(i in 2:ncol(results.table)) {
+  temp <- results.table %>% filter(results.table[,i]==1) %>% dplyr::select(AGI)
+write.csv(temp, file = file.path("../output", paste(names(eGOseqs.list2)[2], colnames(results.table)[i],"enriched.csv", sep = ".")))
+}
+```
+
+```{r}
+
+names(eGOseqs.list2)[3]
+names(DEG.list)[3]
+results.table<-genes.in.enriched.category(enrich.result=eGOseqs.list2[[3]],gene.list=gsub("(.)(\\.[[:digit:]]+)","\\1",(DEG.list[[3]] %>% filter(DEG.list[[3]][3]<0))$gene_id))
+
+for(i in 2:ncol(results.table)) {
+  temp <- results.table %>% filter(results.table[,i]==1) %>% dplyr::select(AGI)
+write.csv(temp, file = file.path("../output", paste(names(eGOseqs.list2)[3], colnames(results.table)[i],"enriched.csv", sep = ".")))
+}
+```
+
+```{r}
+
+names(eGOseqs.list2)[4]
+names(DEG.list)[3]
+results.table<-genes.in.enriched.category(enrich.result=eGOseqs.list2[[4]],gene.list=gsub("(.)(\\.[[:digit:]]+)","\\1",(DEG.list[[3]] %>% filter(DEG.list[[3]][3]>0))$gene_id))
+
+for(i in 2:ncol(results.table)) {
+  temp <- results.table %>% filter(results.table[,i]==1) %>% dplyr::select(AGI)
+write.csv(temp, file = file.path("../output", paste(names(eGOseqs.list2)[4], colnames(results.table)[i],"enriched.csv", sep = ".")))
+}
+```
+
+```{r}
+
+names(eGOseqs.list2)[5]
+names(DEG.list)[4]
+results.table<-genes.in.enriched.category(enrich.result=eGOseqs.list2[[5]],gene.list=gsub("(.)(\\.[[:digit:]]+)","\\1",(DEG.list[[4]] %>% filter(DEG.list[[4]][3]<0))$gene_id))
+
+for(i in 2:ncol(results.table)) {
+  temp <- results.table %>% filter(results.table[,i]==1) %>% dplyr::select(AGI)
+write.csv(temp, file = file.path("../output", paste(names(eGOseqs.list2)[5], colnames(results.table)[i],"enriched.csv", sep = ".")))
+}
+```
+
+```{r}
+
+names(eGOseqs.list2)[6]
+names(DEG.list)[4]
+results.table<-genes.in.enriched.category(enrich.result=eGOseqs.list2[[6]],gene.list=gsub("(.)(\\.[[:digit:]]+)","\\1",(DEG.list[[4]] %>% filter(DEG.list[[4]][3]>0))$gene_id))
+
+for(i in 2:ncol(results.table)) {
+  temp <- results.table %>% filter(results.table[,i]==1) %>% dplyr::select(AGI)
+write.csv(temp, file = file.path("../output", paste(names(eGOseqs.list2)[6], colnames(results.table)[i],"enriched.csv", sep = ".")))
+}
+```
+
+```{r}
+genes.in.BP.category <- list.files(path=file.path("..", "output"), pattern="GO:(\\d)+\\.enriched.csv")
+genes.in.BP.category.list <- lapply(genes.in.BP.category,function(x) read_csv(paste(file.path("../output"), "/", x,sep = "")))
+names(genes.in.BP.category.list) <- gsub("\\.csv", "", genes.in.BP.category)
+
+
+```
+
+
+
+```{r}
+ for (i in 1:length(genes.in.BP.category.list)) {
+   genes.in.BP.category.list[[i]]$category <- gsub("\\.enriched", "", names(genes.in.BP.category.list)[i])
+   if (i<=9){
+      genes.in.BP.category.list[[i]]<- genes.in.BP.category.list[[i]] %>% separate(category, into = c("gt","tp","ref", "up_or_down", "category"), sep = "\\.") %>% unite(sample, 3:6)
+   }
+   else{
+     genes.in.BP.category.list[[i]]<- genes.in.BP.category.list[[i]] %>% separate(category, into = c("gt","tp","ref1", "ref2", "up_or_down", "category"), sep = "\\.") %>% unite(sample, 3:7)
+   }
+   
+ }
+```
+
+```{r}
+names(genes.in.BP.category.list)
+genes.in.BP.category.list[[20]]
+```
+
+
+```{r}
+genes.in.each.BP.category <- do.call("rbind", genes.in.BP.category.list)
+genes.in.each.BP.category <- genes.in.each.BP.category[,-1]
+```
+add description
+```{r}
+load("../output/gene.description.Rdata")
+
+genes.in.each.BP.category <- genes.in.each.BP.category %>% left_join(gene.description, by = c("AGI"="gene_id") )
+
+##add GO terms
+genes.in.each.BP.category$term <- Term(GOTERM[genes.in.each.BP.category$category])
+genes.in.each.BP.category$definition <- Definition(GOTERM[genes.in.each.BP.category$category])
+
+
+write.csv(genes.in.each.BP.category, file = file.path("../output", "genes.in.enriched.BP.category.csv"))
+```
+
+
 
 # use hormone responsive genes for goseq analysis
 
-```{r}
-for(n in c(1,2,3,5)) {
-library(dplyr)
-  
-genelist.up<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))>0)
-genelist.down<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))<0)
-    GO.ORA.temp.up<-GOseq.Atgoslim.BP.list.ORA(gsub("\\.[[:digit:]]+", "", as_vector(genelist.up[,"gene_id"])),custom.category.list=Atgoslim.TAIR.BP.list, expressed.genes = expressed.genes)
-    GO.ORA.temp.down<-GOseq.Atgoslim.BP.list.ORA(gsub("\\.[[:digit:]]+", "", as_vector(genelist.down[,"gene_id"])),custom.category.list=Atgoslim.TAIR.BP.list, expressed.genes = expressed.genes)
-    # handling "no enriched GO" 
-    # genelist.names<-c("GO.ORA.temp.up_down","GO.ORA.temp.down_up") # test
-    x<-list(GO.ORA.temp.up=GO.ORA.temp.up,
-            GO.ORA.temp.down=GO.ORA.temp.down) # list
-    print(x[x=="no enriched GO"])
-    x<-x[!x=="no enriched GO"] # reove "no enriched GO" result
-    if (length(x)!=0) {
-    ## add sample info and FC info and save GO.ORA result
-  for (i in 1:length(x)) {
-      GO.ORA.result<-x[[i]] %>% mutate(FC = gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),sample=DEG.objs2[n])
-    save(GO.ORA.result,file=file.path("..","output",paste(gsub(".csv","",DEG.objs2[n]),gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),"single.coef.enrich.myc.Rdata",sep=".")))
-    rm(GO.ORA.result)
-  }
-    }
-}
-```
+
 
 ```{r}
  # bias.data vector must have the same length as DEgenes vector! 
@@ -242,10 +373,10 @@ GOseq.At.customcat.ORA<-function(genelist,padjust=0.05,custom.category.list=At.h
   bias<-Biostrings::width(cdna)
   # add name to "bias". cdna
   #names(bias)<-names(cdna)
- names(bias) <- tibble(name=names(cdna)) %>% separate(name,into=c("name2","Symbol","description"),sep=" \\|",extra="drop",fill="left") %>%  mutate(AGI=str_remove(name2,pattern="\\.[[:digit:]]+")) %>% pull(AGI)
+ names(bias) <- tibble(name=names(cdna)) %>% separate(name,into=c("name2","Symbol","description"),sep=" \\|",extra="drop",fill="left") %>%  mutate(AGI=gsub(pattern="\\.[[:digit:]]+", "", name2)) %>% pull(AGI)
  if(background=="") {print("Use all genes in genome as background")} else {
  # select only expressed geens 
-  bias <- bias[background]
+  bias <- bias[background$gene_id]
   print("Expessed genes are used as background.")
   print(paste("length of bias is ",length(bias)))
  }
@@ -267,12 +398,91 @@ GOseq.At.customcat.ORA<-function(genelist,padjust=0.05,custom.category.list=At.h
 }
 ```
 
+
 ```{r}
-up <- 
+for(n in c(1,2,3,5,7,9,11,13)) {
+library(dplyr)
+  
+genelist.up<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))>0)
+genelist.down<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))<0)
+    GO.ORA.temp.up<-GOseq.At.customcat.ORA(gsub("\\.[[:digit:]]+", "", as_vector(genelist.up[,"gene_id"])), background = expressed.genes)
+    GO.ORA.temp.down<-GOseq.At.customcat.ORA(gsub("\\.[[:digit:]]+", "", as_vector(genelist.down[,"gene_id"])), background = expressed.genes)
+    # handling "no enriched GO" 
+    # genelist.names<-c("GO.ORA.temp.up_down","GO.ORA.temp.down_up") # test
+    x<-list(GO.ORA.temp.up=GO.ORA.temp.up,
+            GO.ORA.temp.down=GO.ORA.temp.down) # list
+    print(x[x=="no enriched GO"])
+    x<-x[!x=="no enriched GO"] # reove "no enriched GO" result
+    if (length(x)!=0) {
+    ## add sample info and FC info and save GO.ORA result
+  for (i in 1:length(x)) {
+      GO.ORA.result<-x[[i]] %>% mutate(FC = gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),sample=DEG.objs2[n])
+    save(GO.ORA.result,file=file.path("..","output",paste(gsub(".csv","",DEG.objs2[n]),gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),"single.coef.enrich.hormone.responsive.Rdata",sep=".")))
+    rm(GO.ORA.result)
+  }
+    }
+}
 ```
 
 ```{r}
-GOseq.At.customcat.ORA(genelist=, background="expressed.genes")
+
+
+eGOseqs<-list.files(pattern="single.coef.enrich.hormone.responsive.Rdata",path=file.path("..", "output"))[1:7]
+eGOseqs.list2<-sapply(file.path("..","output",eGOseqs),function(x) mget(load(x))) # mget will return the value of the object(or objects) in a list. see https://stackoverflow.com/questions/29398630/load-data-frames-into-list
+#names(eGOseqs.list2)
+eGOseqs.list2.summary<-do.call("rbind",eGOseqs.list2) 
+#head(eGOseqs.list2.summary) # make sure those are file names
+rownames(eGOseqs.list2.summary)<-1:nrow(eGOseqs.list2.summary)
+
+
+```
+
+```{r}
+# eGOseqs.list2.summary (more than three genes in each KO)
+eGOseqs.list2.summary<-eGOseqs.list2.summary[eGOseqs.list2.summary$numDEInCat>3,] # I see
+# focused on only very significant GO terms
+eGOseqs.list2.summary<-eGOseqs.list2.summary[eGOseqs.list2.summary$over_represented_padjust<0.05,]
+# how to cluster GO Ontology according to this pattern?
+## using hclust to sort GO terms
+GO.list<-unique(eGOseqs.list2.summary$category)
+sample.list<-unique(eGOseqs.list2.summary$sample_FC) # revised
+# having x-label also used the x-label for df below
+eGOseqs.list2.summary <- eGOseqs.list2.summary %>% mutate(sample=gsub(".csv", "", sample)) %>% mutate(sample=gsub(".DEGs.int", "", sample)) %>% unite(sample_FC,sample,FC)
+
+# Making matrix for calculate hierarchical clustering of "over-representd_padjust" value using sperad
+df<-eGOseqs.list2.summary %>% dplyr::select(category,sample_FC,over_represented_padjust) %>% spread(sample_FC,over_represented_padjust,-1)
+
+df[df<1e-100]<-1e-100 # to avoid "Inf" after log10 transformation
+df<- df %>% mutate_at(vars(2:10) ,.funs=function(x) -log10(x))
+# df<- df %>% mutate_at(vars(2:11) ,.funs=-log10) # does not work
+df[is.na(df)]<-1
+df2<-df[,2:10]
+rownames(df2)<-df$category
+hc<-stats::hclust(dist(df2), "ave") # only numbers
+hc$order
+```
+
+```{r}
+hc.tib<-tibble(category=hc$labels,order=hc$order)
+# change term order using hclust() results
+hc.tib2<-hc.tib %>% arrange(desc(order))
+#eGOseqs.list2.summary$term<-factor(eGOseqs.list2.summary$term,levels=as_vector(hc.tib2$term))
+# To avoid gray color, add 1e-20 to smaller padjust value
+eGOseqs.list2.summary$over_represented_padjust[eGOseqs.list2.summary$over_represented_padjust<1e-50]<-1e-50
+# format x label
+#eGOseqs.list2.summary <- eGOseqs.list2.summary  %>% mutate(sample2=str_replace(sample,"trt.density","trt_density")) %>%  separate(sample2,into=c("tissue","factor","DEGs","model","ref_density","ref_soil"),sep="\\.") %>% mutate(ref_soil=str_remove(ref_soil,"r")) %>% mutate(ref_density=str_remove(ref_density,"r"))  %>% unite(density_FC,ref_density,FC) # simplify elements in "density_FC" column for simpler x label in heatmap
+# plot
+  GOseq.plot<-ggplot(eGOseqs.list2.summary,aes(x=sample_FC,y=category)) + geom_tile(aes(fill=-log10(over_represented_padjust)),colour="black")  + scale_fill_gradient2(limit=c(0,50),low=muted("green"), high=muted("magenta")) # OK
+GOseq.plot<-GOseq.plot+     theme(axis.text.x=element_text(size=10,angle=90),
+          axis.text.y=element_text(size=10),
+          axis.title=element_text(size=10),
+          axis.ticks = element_blank(),
+          panel.background = element_rect(fill = "white",colour="black"),
+          plot.title=element_text(size=20),
+          axis.line=element_blank()) + labs(x="",y="",title="",fill="-log10\n pvalue")
+GOseq.plot
+
+ggsave(filename = "GO.enrich.heatmap.single.coef.hormone.responsive.all.pdf", plot = GOseq.plot, path = "../output", height = 5, width = 5,units = "in")
 ```
 
 
@@ -281,8 +491,8 @@ DEG.list
 ```
 
 ```{r}
-genes.in.enriched.category<-function(enrich.result,gene.list,category.table=Atgoslim.TAIR.BP.list) { # return data frame with all input data with ... which format is good? VennDiagram input format?  
-  enrich.category<-enrich.result[enrich.result$over_represented_pvalue<0.05,"category"]
+genes.in.enriched.category<-function(enrich.result,gene.list,category.table=At.hormone.responsive.list) { # return data frame with all input data with ... which format is good? VennDiagram input format?  
+  enrich.category<-enrich.result[enrich.result$over_represented_padjust<0.05,"category"]
   temp<-category.table[gene.list] # short category.table for enriched.result # gene.list shas to be character (not factor)  
   #names(temp[!is.na(names(temp))])
   temp<-temp[!is.na(names(temp))] # remove non matched AGI
@@ -299,11 +509,156 @@ genes.in.enriched.category<-function(enrich.result,gene.list,category.table=Atgo
 
 ```{r}
 names(eGOseqs.list2)
+names(eGOseqs.list2) <- gsub("../output/DEgenes.", "", names(eGOseqs.list2))
+names(eGOseqs.list2) <- gsub(".single.+", "", names(eGOseqs.list2))
+```
+```{r}
+names(eGOseqs.list2)
+names(DEG.list)
 ```
 
 
 ```{r}
-results.table<-genes.in.enriched.category(enrich.result=eGOseqs.list2[[2]],gene.list=gsub("(.)(\\.[[:digit:]]+)","\\1",DEG.list[[2]]$gene_id))
-results.table[1:10,1:10]
+names(eGOseqs.list2)[1]
+names(DEG.list)[1]
+#down
+results.table<-genes.in.enriched.category(enrich.result=eGOseqs.list2[[1]],gene.list=gsub("(.)(\\.[[:digit:]]+)","\\1",(DEG.list[[1]] %>% filter(DEG.list[[1]][3]<0))$gene_id))
+ncol(results.table)
+results.table.Col.1h.rH.down.hormone.responsive <- results.table %>% filter(results.table[,2]==1) %>% dplyr::select(AGI)
+write.csv(results.table.Col.1h.rH.down.hormone.responsive, file = file.path("../output", paste(names(eGOseqs.list2)[1], colnames(results.table)[2],"enriched.csv", sep = ".")))
+
+
+```
+
+```{r}
+names(eGOseqs.list2)[2]
+names(DEG.list)[1]
+results.table<-genes.in.enriched.category(enrich.result=eGOseqs.list2[[2]],gene.list=gsub("(.)(\\.[[:digit:]]+)","\\1",(DEG.list[[1]] %>% filter(DEG.list[[1]][3]>0))$gene_id))
+
+for(i in 2:ncol(results.table)) {
+  temp <- results.table %>% filter(results.table[,i]==1) %>% dplyr::select(AGI)
+write.csv(temp, file = file.path("../output", paste(names(eGOseqs.list2)[2], colnames(results.table)[i],"enriched.csv", sep = ".")))
+}
+
+```
+
+
+```{r}
+names(eGOseqs.list2)[3]
+names(DEG.list)[2]
+results.table<-genes.in.enriched.category(enrich.result=eGOseqs.list2[[3]],gene.list=gsub("(.)(\\.[[:digit:]]+)","\\1",(DEG.list[[2]] %>% filter(DEG.list[[2]][3]>0))$gene_id))
+
+for(i in 2:ncol(results.table)) {
+  temp <- results.table %>% filter(results.table[,i]==1) %>% dplyr::select(AGI)
+write.csv(temp, file = file.path("../output", paste(names(eGOseqs.list2)[3], colnames(results.table)[i],"enriched.csv", sep = ".")))
+}
+```
+
+```{r}
+names(eGOseqs.list2)[4]
+names(DEG.list)[3]
+results.table<-genes.in.enriched.category(enrich.result=eGOseqs.list2[[4]],gene.list=gsub("(.)(\\.[[:digit:]]+)","\\1",(DEG.list[[3]] %>% filter(DEG.list[[3]][3]<0))$gene_id))
+
+for(i in 2:ncol(results.table)) {
+  temp <- results.table %>% filter(results.table[,i]==1) %>% dplyr::select(AGI)
+write.csv(temp, file = file.path("../output", paste(names(eGOseqs.list2)[4], colnames(results.table)[i],"enriched.csv", sep = ".")))
+}
+```
+
+```{r}
+names(eGOseqs.list2)[5]
+names(DEG.list)[3]
+results.table<-genes.in.enriched.category(enrich.result=eGOseqs.list2[[5]],gene.list=gsub("(.)(\\.[[:digit:]]+)","\\1",(DEG.list[[3]] %>% filter(DEG.list[[3]][3]>0))$gene_id))
+
+for(i in 2:ncol(results.table)) {
+  temp <- results.table %>% filter(results.table[,i]==1) %>% dplyr::select(AGI)
+write.csv(temp, file = file.path("../output", paste(names(eGOseqs.list2)[5], colnames(results.table)[i],"enriched.csv", sep = ".")))
+}
+```
+
+```{r}
+names(eGOseqs.list2)[6]
+names(DEG.list)[4]
+results.table<-genes.in.enriched.category(enrich.result=eGOseqs.list2[[6]],gene.list=gsub("(.)(\\.[[:digit:]]+)","\\1",(DEG.list[[4]] %>% filter(DEG.list[[4]][3]<0))$gene_id))
+
+for(i in 2:ncol(results.table)) {
+  temp <- results.table %>% filter(results.table[,i]==1) %>% dplyr::select(AGI)
+write.csv(temp, file = file.path("../output", paste(names(eGOseqs.list2)[6], colnames(results.table)[i],"enriched.csv", sep = ".")))
+}
+```
+
+
+```{r}
+names(eGOseqs.list2)[7]
+names(DEG.list)[4]
+results.table<-genes.in.enriched.category(enrich.result=eGOseqs.list2[[7]],gene.list=gsub("(.)(\\.[[:digit:]]+)","\\1",(DEG.list[[4]] %>% filter(DEG.list[[4]][3]>0))$gene_id))
+
+for(i in 2:ncol(results.table)) {
+  temp <- results.table %>% filter(results.table[,i]==1) %>% dplyr::select(AGI)
+write.csv(temp, file = file.path("../output", paste(names(eGOseqs.list2)[7], colnames(results.table)[i],"enriched.csv", sep = ".")))
+}
+```
+#below is for npr1, 
+```{r}
+names(eGOseqs.list2)[8]
+names(DEG.list)[7]
+results.table<-genes.in.enriched.category(enrich.result=eGOseqs.list2[[8]],gene.list=gsub("(.)(\\.[[:digit:]]+)","\\1",DEG.list[[7]]$gene_id))
+
+for(i in 2:ncol(results.table)) {
+  temp <- results.table %>% filter(results.table[,i]==1) %>% dplyr::select(AGI)
+write.csv(temp, file = file.path("../output", paste(names(eGOseqs.list2)[8], colnames(results.table)[i],"enriched.csv", sep = ".")))
+}
+```
+
+
+```{r}
+names(eGOseqs.list2)[9]
+names(DEG.list)[9]
+results.table<-genes.in.enriched.category(enrich.result=eGOseqs.list2[[9]],gene.list=gsub("(.)(\\.[[:digit:]]+)","\\1",DEG.list[[9]]$gene_id))
+
+for(i in 2:ncol(results.table)) {
+  temp <- results.table %>% filter(results.table[,i]==1) %>% dplyr::select(AGI)
+write.csv(temp, file = file.path("../output", paste(names(eGOseqs.list2)[9], colnames(results.table)[i],"enriched.csv", sep = ".")))
+}
+```
+# find out genes in each hormone responsive category
+```{r}
+genes.in.hormone.responsive.category <- list.files(path=file.path("..", "output"), pattern="enriched.csv")
+genes.in.hormone.responsive.category <- genes.in.hormone.responsive.category[-grep("GO:(\\d)+", genes.in.hormone.responsive.category)]
+genes.in.hormone.responsive.category.list <- lapply(genes.in.hormone.responsive.category,function(x) read_csv(paste(file.path("../output"), "/", x,sep = "")))
+names(genes.in.hormone.responsive.category.list) <- gsub("\\.csv", "", genes.in.hormone.responsive.category)
+
+
+```
+
+```{r}
+#head(Description.merge)
+#head (gene.description)
+#gene.description <- gene.description %>% left_join(Description.merge, by=c("gene_id"="ID"))
+#save(gene.description, file = file.path("../output", "gene.description.Rdata"))
+```
+
+```{r}
+ for (i in 1:length(genes.in.hormone.responsive.category.list)) {
+   genes.in.hormone.responsive.category.list[[i]]$category <- gsub("\\.enriched", "", names(genes.in.hormone.responsive.category.list)[i])
+   if (i<=7){
+      genes.in.hormone.responsive.category.list[[i]]<- genes.in.hormone.responsive.category.list[[i]] %>% separate(category, into = c("gt","tp","ref", "up_or_down", "category"), sep = "\\.") %>% unite(sample, 3:6)
+   }
+   else{
+     genes.in.hormone.responsive.category.list[[i]]<- genes.in.hormone.responsive.category.list[[i]] %>% separate(category, into = c("gt","tp","ref1", "ref2", "up_or_down", "category"), sep = "\\.") %>% unite(sample, 3:7)
+   }
+   
+ }
+```
+
+```{r}
+genes.in.each.hormone.responsive.category <- do.call("rbind", genes.in.hormone.responsive.category.list)
+genes.in.each.hormone.responsive.category <- genes.in.each.hormone.responsive.category[,-1]
+```
+add description
+```{r}
+genes.in.each.hormone.responsive.category <- genes.in.each.hormone.responsive.category %>% left_join(gene.description, by = c("AGI"="gene_id") )
+
+write.csv(genes.in.each.hormone.responsive.category, file = file.path("../output", "genes.in.enriched.hormone.responsive.category.csv"))
 ```
 
