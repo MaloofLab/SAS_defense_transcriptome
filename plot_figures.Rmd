@@ -22,40 +22,29 @@ rownames(log2_cpm) <- gsub("\\.\\d", "", rownames(log2_cpm))
 #subset Col and myc234 data
 
 log2_cpm <- log2_cpm[, 1:32]
+head(log2_cpm)
 ```
 
 ```{r}
+#
+list.files(path=file.path("..","output"), pattern = ".rH\\.csv")
+
+#only retain the Col and myc234 data
 DEG.objs2 <- list.files(path=file.path("..","output"), pattern = ".rH\\.csv")[1:6]
 ```
 
 
 ```{r}
-# read csv file
+# read csv file into a large list
 DEG.list<-lapply(DEG.objs2, function(x) read_csv(paste(file.path("..","output"),"/",x,sep="")))
 names(DEG.list)<-gsub(".csv","",DEG.objs2)
 ```
 
 
 # expression pattern of genes differentially expressed in Col after 1h treatment compared to high red/far-red ratio;
-## Julin's function
-```{r}
 
 
-plotDE <- function(genes, dge, sample.description) {
-  require(ggplot2)
-  require(reshape2)
-  tmp.data <- t(log2(cpm(dge[genes,])+1))
-  tmp.data <- merge(tmp.data,sample.description,by.x="row.names",by.y="sample")
-  tmp.data <- melt(tmp.data,value.name="log2_cpm",variable.name="gene")
-  pl <- ggplot(tmp.data,aes(x=gt,y=log2_cpm,fill=trt))
-  pl <- pl + facet_grid(tp~gene)
-  pl <- pl + ylab("log2(cpm)") + xlab("genotype")
-  pl <- pl + geom_boxplot()
-  pl + theme(axis.text.x  = element_text(angle=45, vjust=1,hjust=1))
-}
-```
 
-## Kazu's function
 ```{r}
 #tp=1 or 49, 
 for (i in 1:6) {
@@ -67,37 +56,37 @@ if (str_detect(names(DEG.list)[i],"1h")) {
 plot.data.up <- merge(log2_cpm, genes.up, by.x="row.names", by.y="gene_id") 
 #head(plot.data.up)
 plot.data.up <- plot.data.up %>% dplyr::select(1, colnames(plot.data.up)[-1][grep("1h",colnames(log2_cpm))], "name") %>% unite(row.names,c("Row.names","name")) %>% gather(sample,value,-1) %>% separate(sample,c("genotype","time_hr","trt","rep"),sep="_") 
-plot.up <- plot.data.up %>% ggplot(aes(x=genotype,y=value,color=trt))  + geom_boxplot() + facet_wrap(~row.names,scale="free",labeller = label_wrap_gen(width=30), ncol = 4)+theme(strip.text = element_text(size=10))+ggtitle(paste(names(DEG.list)[i], "up", sep = "."))+ ylab("log2(cpm)")
+plot.up <- plot.data.up %>% ggplot(aes(x=genotype,y=value,color=trt))  + geom_boxplot() + facet_wrap(~row.names,scale="free",labeller = label_wrap_gen(width=30), ncol = 4)+theme(strip.text = element_text(size=5))+ggtitle(paste(names(DEG.list)[i], "up", sep = "."))+ ylab("log2(cpm)")
 plot.up
 
-ggsave(plot.up, file = file.path ("../figures", paste(names(DEG.list)[i], "up.pdf", sep = ".")), width = 20,height = 40, units = "in", limitsize = FALSE)
+ggsave(plot.up, file = file.path ("../figures", paste(names(DEG.list)[i], "up.pdf", sep = ".")), width = 10,height = 10, units = "in", limitsize = FALSE)
 
 
 plot.data.down <- merge(log2_cpm, genes.down, by.x="row.names", by.y="gene_id") 
 #head(plot.data.down)
 plot.data.down <- plot.data.down %>% dplyr::select(1, colnames(plot.data.down)[-1][grep("1h",colnames(log2_cpm))], "name") %>% unite(row.names,c("Row.names","name")) %>% gather(sample,value,-1) %>% separate(sample,c("genotype","time_hr","trt","rep"),sep="_") 
-plot.down <- plot.data.down %>% ggplot(aes(x=genotype,y=value,color=trt))  + geom_boxplot() + facet_wrap(~row.names,scale="free",labeller = label_wrap_gen(width=30), ncol = 4)+theme(strip.text = element_text(size=10))+ggtitle(paste(names(DEG.list)[i], "down", sep = "."))+ ylab("log2(cpm)")
+plot.down <- plot.data.down %>% ggplot(aes(x=genotype,y=value,color=trt))  + geom_boxplot() + facet_wrap(~row.names,scale="free",labeller = label_wrap_gen(width=30), ncol = 4)+theme(strip.text = element_text(size=5))+ggtitle(paste(names(DEG.list)[i], "down", sep = "."))+ ylab("log2(cpm)")
 plot.down
 
-ggsave(plot.down, file = file.path ("../figures", paste(names(DEG.list)[i], "down.pdf", sep = ".")), width = 20,height = 40, units = "in",limitsize = FALSE) 
+ggsave(plot.down, file = file.path ("../figures", paste(names(DEG.list)[i], "down.pdf", sep = ".")), width = 10,height = 10, units = "in",limitsize = FALSE) 
 } else if (str_detect(names(DEG.list)[i],"49h")) {
  #only leave the gene id and sample_id colum
 plot.data.up <- merge(log2_cpm, genes.up, by.x="row.names", by.y="gene_id") 
 #head(plot.data.up)
 plot.data.up <- plot.data.up %>% dplyr::select(1, colnames(plot.data.up)[-1][grep("49h",colnames(log2_cpm))], "name") %>% unite(row.names,c("Row.names","name")) %>% gather(sample,value,-1) %>% separate(sample,c("genotype","time_hr","trt","rep"),sep="_") 
-plot.up <- plot.data.up %>% ggplot(aes(x=genotype,y=value,color=trt))  + geom_boxplot() + facet_wrap(~row.names,scale="free",labeller = label_wrap_gen(width=30), ncol = 4)+theme(strip.text = element_text(size=10))+ggtitle(paste(names(DEG.list)[i], "up", sep = "."))+ ylab("log2(cpm)")
+plot.up <- plot.data.up %>% ggplot(aes(x=genotype,y=value,color=trt))  + geom_boxplot() + facet_wrap(~row.names,scale="free",labeller = label_wrap_gen(width=30), ncol = 4)+theme(strip.text = element_text(size=5))+ggtitle(paste(names(DEG.list)[i], "up", sep = "."))+ ylab("log2(cpm)")
 plot.up
 
-ggsave(plot.up, file = file.path ("../figures", paste(names(DEG.list)[i], "up.pdf", sep = ".")), width = 20,height = 40, units = "in",limitsize = FALSE)
+ggsave(plot.up, file = file.path ("../figures", paste(names(DEG.list)[i], "up.pdf", sep = ".")), width = 10,height = 10, units = "in",limitsize = FALSE)
 
 
 plot.data.down <- merge(log2_cpm, genes.down, by.x="row.names", by.y="gene_id") 
 #head(plot.data.down)
 plot.data.down <- plot.data.down %>% dplyr::select(1, colnames(plot.data.down)[-1][grep("49h",colnames(log2_cpm))], "name") %>% unite(row.names,c("Row.names","name")) %>% gather(sample,value,-1) %>% separate(sample,c("genotype","time_hr","trt","rep"),sep="_") 
-plot.down <- plot.data.down %>% ggplot(aes(x=genotype,y=value,color=trt))  + geom_boxplot() + facet_wrap(~row.names,scale="free",labeller = label_wrap_gen(width=30), ncol = 4)+theme(strip.text = element_text(size=10))+ggtitle(paste(names(DEG.list)[i], "down", sep = "."))+ ylab("log2(cpm)")
+plot.down <- plot.data.down %>% ggplot(aes(x=genotype,y=value,color=trt))  + geom_boxplot() + facet_wrap(~row.names,scale="free",labeller = label_wrap_gen(width=30), ncol = 4)+theme(strip.text = element_text(size=5))+ggtitle(paste(names(DEG.list)[i], "down", sep = "."))+ ylab("log2(cpm)")
 plot.down
 
-ggsave(plot.down, file = file.path ("../figures", paste(names(DEG.list)[i], "down.pdf", sep = ".")), width = 20,height =40, units = "in",limitsize = FALSE) 
+ggsave(plot.down, file = file.path ("../figures", paste(names(DEG.list)[i], "down.pdf", sep = ".")), width = 10,height =10, units = "in",limitsize = FALSE) 
 }
 
 }
@@ -124,17 +113,17 @@ for (i in levels(genes.in.GO.terms$sample)) {
   
   if (str_detect(i,"1h")) {
     data.plot <- data.plot.all %>% filter(sample==i) %>% unite(AGI_name, "Row.names", "name") %>% unite(GO_terms, "category", "term") %>% dplyr::select(colnames(data.plot.all)[-1][grep("1h",colnames(log2_cpm))], "AGI_name", "GO_terms") %>% gather(sample,value,-(17:18)) %>% separate(sample,c("genotype","time_hr","trt","rep"),sep="_")
-  plot <-data.plot %>% ggplot(aes(x=genotype,y=value,color=trt))  + geom_boxplot() + facet_wrap(GO_terms~AGI_name,scale="free",labeller = label_wrap_gen(width=30), ncol = 4)+theme(strip.text = element_text(size=10))+ggtitle(paste("genes_in_each_enriched_GOterms_in", i, sep = "_"))+ ylab("log2(cpm)")
+  plot <-data.plot %>% ggplot(aes(x=genotype,y=value,color=trt))  + geom_boxplot() + facet_wrap(GO_terms~AGI_name,scale="free",labeller = label_wrap_gen(width=30), ncol = 4)+theme(strip.text = element_text(size=5))+ggtitle(paste("genes_in_each_enriched_GOterms_in", i, sep = "_"))+ ylab("log2(cpm)")
  
    
   } else if (str_detect(i,"49h")) {
     
     data.plot <- data.plot.all %>% filter(sample==i) %>% unite(AGI_name, "Row.names", "name") %>% unite(GO_terms, "category", "term") %>% dplyr::select(colnames(data.plot.all)[-1][grep("49h",colnames(log2_cpm))], "AGI_name", "GO_terms") %>% gather(sample,value,-(17:18)) %>% separate(sample,c("genotype","time_hr","trt","rep"),sep="_")
-    plot <-data.plot %>% ggplot(aes(x=genotype,y=value,color=trt))  + geom_boxplot() + facet_wrap(GO_terms~AGI_name,scale="free",labeller = label_wrap_gen(width=30), ncol = 4)+theme(strip.text = element_text(size=10))+ggtitle(paste("genes_in_each_enriched_GOterms_in", i, sep = "_"))+ ylab("log2(cpm)")
+    plot <-data.plot %>% ggplot(aes(x=genotype,y=value,color=trt))  + geom_boxplot() + facet_wrap(GO_terms~AGI_name,scale="free",labeller = label_wrap_gen(width=30), ncol = 4)+theme(strip.text = element_text(size=5))+ggtitle(paste("genes_in_each_enriched_GOterms_in", i, sep = "_"))+ ylab("log2(cpm)")
 
   }
    
-  ggsave(plot, file = file.path ("../figures2", paste("genes.in.each.enriched.GOterms.in", i,"pdf", sep = ".")), width = 20,height =150, units = "in",limitsize = FALSE) 
+  ggsave(plot, file = file.path ("../figures", paste("genes.in.each.enriched.GOterms.in", i,"pdf", sep = ".")), width = 10,height =100, units = "in",limitsize = FALSE) 
 }
 ```
 
@@ -169,16 +158,16 @@ for (i in levels(genes.in.hormone.category$sample)) {
   
   if (str_detect(i,"1h")) {
     data.plot <- data.plot.all %>% filter(sample==i) %>% unite(AGI_name, "Row.names", "name") %>% dplyr::select(colnames(data.plot.all)[-1][grep("1h",colnames(log2_cpm))], "AGI_name", "category") %>% gather(sample,value,-(17:18)) %>% separate(sample,c("genotype","time_hr","trt","rep"),sep="_")
-  plot <-data.plot %>% ggplot(aes(x=genotype,y=value,color=trt))  + geom_boxplot() + facet_wrap(category~AGI_name,scale="free",labeller = label_wrap_gen(width=30), ncol = 4)+theme(strip.text = element_text(size=10))+ggtitle(paste("genes_in_each_enriched_hormone_responsive_category_in", i, sep = "_"))+ ylab("log2(cpm)")
+  plot <-data.plot %>% ggplot(aes(x=genotype,y=value,color=trt))  + geom_boxplot() + facet_wrap(category~AGI_name,scale="free",labeller = label_wrap_gen(width=30), ncol = 4)+theme(strip.text = element_text(size=5))+ggtitle(paste("genes_in_each_enriched_hormone_responsive_category_in", i, sep = "_"))+ ylab("log2(cpm)")
  
    
   } else if (str_detect(i,"49h")) {
     
     data.plot <- data.plot.all %>% filter(sample==i) %>% unite(AGI_name, "Row.names", "name") %>% dplyr::select(colnames(data.plot.all)[-1][grep("49h",colnames(log2_cpm))], "AGI_name", "category") %>% gather(sample,value,-(17:18)) %>% separate(sample,c("genotype","time_hr","trt","rep"),sep="_")
-    plot <-data.plot %>% ggplot(aes(x=genotype,y=value,color=trt))  + geom_boxplot() + facet_wrap(category~AGI_name,scale="free",labeller = label_wrap_gen(width=30), ncol = 4)+theme(strip.text = element_text(size=10))+ggtitle(paste("genes_in_each_enriched_hormone_responsive_category_in", i, sep = "_"))+ ylab("log2(cpm)")
+    plot <-data.plot %>% ggplot(aes(x=genotype,y=value,color=trt))  + geom_boxplot() + facet_wrap(category~AGI_name,scale="free",labeller = label_wrap_gen(width=30), ncol = 4)+theme(strip.text = element_text(size=5))+ggtitle(paste("genes_in_each_enriched_hormone_responsive_category_in", i, sep = "_"))+ ylab("log2(cpm)")
 
   }
    
-  ggsave(plot, file = file.path ("../figures2", paste("genes.in.each.enriched.hormone.responsive.category.in", i,"pdf", sep = ".")), width = 20,height =20, units = "in",limitsize = FALSE) 
+  ggsave(plot, file = file.path ("../figures", paste("genes.in.each.enriched.hormone.responsive.category.in", i,"pdf", sep = ".")), width = 10,height =80, units = "in",limitsize = FALSE) 
 }
 ```

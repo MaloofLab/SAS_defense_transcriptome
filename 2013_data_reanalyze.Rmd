@@ -7,6 +7,8 @@ output: html_document
 library(goseq)
 library(tidyverse)
 library(readxl)
+library(ggforce)
+library(limma)
 ```
 
 
@@ -106,6 +108,139 @@ down <- DEgenes.2013.rCol %>% filter(`Col-0/myc234` > 1)
 up <- DEgenes.2013.rCol %>% filter(`Col-0/myc234` < 1)
 GOseq.Atgoslim.BP.list.ORA(up$`AGI Code`,custom.category.list=Atgoslim.TAIR.BP.list)
 GOseq.Atgoslim.BP.list.ORA(down$`AGI Code`,custom.category.list=Atgoslim.TAIR.BP.list)
+
+```
+#import my data 2 weeks old
+
+```{r}
+myc.1h <- read_csv(paste(file.path("../output/DEgenes.myc234.1h.rCol.rH.csv")))
+head(myc.1h)
+myc234.2weeks.1h.up <- (myc.1h %>% filter(logFC.gtmyc234 > 0))
+myc234.2weeks.1h.down <- myc.1h %>% filter(logFC.gtmyc234 < 0)
+myc.49h <- read_csv(paste(file.path("../output/DEgenes.myc234.49h.rCol.rH.csv")))
+head(myc.49h)
+myc234.2weeks.49h.up <- myc.49h %>% filter(logFC.gtmyc234 > 0) 
+myc234.2weeks.49h.down <- myc.49h %>% filter(logFC.gtmyc234 < 0)
+```
+
+```{r}
+myc.2013 <- read_excel("../Scbweizer_2013_data/tpc115139SupplementalDS1.xlsx", skip = 4)
+head(myc.2013)
+myc.2013 <- myc.2013 %>% filter(adj.P.Val<0.05)
+myc.2013$`AGI Code` <- toupper(myc.2013$`AGI Code`)
+head(myc.2013)
+myc234.4weeks.up <- myc.2013 %>% filter(`Col-0/myc234` < 1)
+myc234.4weeks.down <- myc.2013 %>% filter(`Col-0/myc234` > 1)
+```
+
+
+```{r}
+df.venn <- data.frame(x = c(0, 0.866, -0.866),
+                      y = c(1, -0.5, -0.5),
+                      labels = c('myc234.2weeks.1h.up', 'myc234.2weeks.49h.up', 'myc234.4weeks.up'))
+ggplot(df.venn, aes(x0 = x, y0 = y, r = 1.5, fill = labels)) +
+    geom_circle(alpha = .3, size = 1, colour = 'grey') +
+      coord_fixed() +
+        theme_void()
+```
+```{r}
+expressed.genes <- read_csv("../output/expressed_genes_counts.csv")
+
+head(expressed.genes)
+expressed.genes.id <- expressed.genes %>% dplyr::select("target_id")
+expressed.genes.id$target_id<- gsub("\\.\\d", "", expressed.genes.id$target_id)
+#should not use expressed genes in my experiment, since could be not expressed in 2013
+
+#use all the ference genes
+
+all.genes <- read_csv("../output/total_counts_data.csv")
+
+all.genes.id <- all.genes %>% dplyr::select("target_id")
+all.genes.id$target_id<- gsub("\\.\\d", "", all.genes.id$target_id)
+
+```
+
+```{r}
+all.genes.id$myc234.2weeks.1h.up <- as.numeric (all.genes.id$target_id %in% myc234.2weeks.1h.up$gene_id)
+all.genes.id$myc234.2weeks.49h.up <- as.numeric(all.genes.id$target_id %in% myc234.2weeks.49h.up$gene_id)
+all.genes.id$myc234.4weeks.up <- as.numeric(all.genes.id$target_id %in% myc234.4weeks.up$`AGI Code`)
+sum(all.genes.id$myc234.4weeks.up)
+
+all.genes.id$myc234.2weeks.1h.down <- as.numeric (all.genes.id$target_id %in% myc234.2weeks.1h.down$gene_id)
+all.genes.id$myc234.2weeks.49h.down <- as.numeric(all.genes.id$target_id %in% myc234.2weeks.49h.down$gene_id)
+all.genes.id$myc234.4weeks.down <- as.numeric(all.genes.id$target_id %in% myc234.4weeks.down$`AGI Code`)
+sum(all.genes.id$myc234.4weeks.down)
+
+all.genes.id <- all.genes.id %>% filter(rowSums(all.genes.id[,-1])!=0)
+
+```
+
+
+```{r}
+vdc.up <- vennCounts(all.genes.id[,2:4])
+class(vdc.up) <- "matrix"
+df.vdc.up <- as.data.frame(vdc.up)[-1,] %>%
+  mutate(x = c(-1.2, 1.2, 0, 0, -0.8, 0.8, 0),
+         y = c(-0.6, -0.6, -1.0, 1.2, 0.5, 0.5, 0))
+```
+
+```{r}
+overlap.up <- ggplot(df.venn) +
+  geom_circle(aes(x0 = x, y0 = y, r = 1.5, fill = labels), alpha = .3, size = 1, colour = 'grey') +
+  coord_fixed() +
+  theme_void() +
+  theme(legend.position = 'bottom') +
+  scale_fill_manual(values = c('cornflowerblue', 'firebrick',  'gold')) +
+  scale_colour_manual(values = c('cornflowerblue', 'firebrick', 'gold'), guide = FALSE) +
+  labs(fill = NULL) +
+  annotate("text", x = df.vdc.up$x, y = df.vdc.up$y, label = df.vdc.up$Counts, size = 5)
+
+overlap.up
+```
+
+
+```{r}
+vdc.down <- vennCounts(all.genes.id[,5:7])
+class(vdc.down) <- "matrix"
+df.vdc.down <- as.data.frame(vdc.down)[-1,] %>%
+  mutate(x = c(-1.2, 1.2, 0, 0, -0.8, 0.8, 0),
+         y = c(-0.6, -0.6, -1.0, 1.2, 0.5, 0.5, 0))
+```
+
+```{r}
+overlap.down <- ggplot(df.venn) +
+  geom_circle(aes(x0 = x, y0 = y, r = 1.5, fill = labels), alpha = .3, size = 1, colour = 'grey') +
+  coord_fixed() +
+  theme_void() +
+  theme(legend.position = 'bottom') +
+  scale_fill_manual(values = c('cornflowerblue', 'firebrick',  'gold')) +
+  scale_colour_manual(values = c('cornflowerblue', 'firebrick', 'gold'), guide = FALSE) +
+  labs(fill = NULL) +
+  annotate("text", x = df.vdc.down$x, y = df.vdc.down$y, label = df.vdc.down$Counts, size = 5)
+
+overlap.down
+```
+
+#find out overlapped genes
+
+```{r}
+up.overlap <- all.genes.id%>% dplyr::select(1:4) 
+up.overlap <- up.overlap%>% filter(rowSums(up.overlap[,-1])!=0)
+up.overlap #<- up.overlap #%>% desc(rowSums(up.overlap[,-1]))
+
+down.overlap <- all.genes.id%>% dplyr::select(1, 5:7) 
+down.overlap <- down.overlap%>% filter(rowSums(down.overlap[,-1])!=0)
+down.overlap #<- down.overlap #%>% desc(rowSums(down.overlap[,-1]))
+
+load("../output/gene.description.Rdata")
+head(gene.description)
+
+up.overlap.myc234 <- left_join(up.overlap,gene.description,by = c("target_id"="gene_id"))
+
+down.overlap.myc234 <- left_join(down.overlap,gene.description,by = c("target_id"="gene_id"))
+
+write.csv(up.overlap.myc234, file = "../output/up.overlap.myc234.csv")
+write.csv(down.overlap.myc234, file = "../output/down.overlap.myc234.csv")
 
 ```
 
