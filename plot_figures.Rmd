@@ -4,6 +4,10 @@ author: "Chunmei Li"
 date: "2018/10/17"
 output: html_document
 ---
+# History
+
+# To Do
+* Label on saved file or maker a comment at "ggsave" line with fig or table numbers to become reader friendly scripts (KN, 102318)
 
 ```{r}
 library(tidyverse)
