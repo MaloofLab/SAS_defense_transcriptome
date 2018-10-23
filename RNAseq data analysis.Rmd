@@ -1,9 +1,17 @@
 ---
 title: "SAS defense transcriptome"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
+# Can you add processes from fastq (quality check by fastqc), trimming, and mapping to reference cDNA? (Kazu)
+
+
+
+
 ```{r}
+library(tidyverse);library(edgeR)
 getwd()
 ```
 
@@ -158,7 +166,7 @@ save(dge.data, file = file.path("..", "output", "dge.Rdata"))
 #make normalization factor plot
 
 ```{r}
-
+load("../output/dge.Rdata")
 ggplot(dge.data$samples,aes(x=sample,y=norm.factors,fill=trt)) + geom_col() + 
   theme(axis.text.x  = element_text(angle=90, vjust=0.5,size = 7))
 ```
