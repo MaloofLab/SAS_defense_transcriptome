@@ -29,21 +29,24 @@ runtime=$((end-start))
 echo $runtime seconds to completion
 
 ## mapping
-!/bin/bash
-start=date +%s
+#!/bin/bash
 
-Identify each array run
+start=`date +%s`
+
+
+## Identify each array run
 cd ~/RNAseq/trimmed
-sample=cat sample_list_trimmed
+sample=`cat sample_list_trimmed`
 
 for i in $sample
-do echo $i
-kallisto quant -i --fr-stranded arabidopsis_cdna.idx -o ~/RNAseq/map_output2/${i}_output --single --plaintext -l 300 -s 100 ${i}
+       do echo $i
+       kallisto quant -i arabidopsis_cdna.idx -o ~/RNAseq/map_output2 --single --plaintext --fr-stranded -l 300 -s 100 ${i}
 done
 
-end=date +%s
+end=`date +%s`
 runtime=$((end-start))
 echo $runtime seconds to completion
+
 
 
 
