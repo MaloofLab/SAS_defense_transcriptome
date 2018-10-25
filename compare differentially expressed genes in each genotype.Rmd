@@ -1,0 +1,10 @@
+---
+title: "compare differentially expressed genes in each genotype"
+output: html_document
+---
+
+```{r}
+installed.packages("VennDiagram")
+library(VennDiagram)
+```
+
