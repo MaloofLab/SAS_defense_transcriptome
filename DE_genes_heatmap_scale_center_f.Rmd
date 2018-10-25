@@ -7,11 +7,14 @@ editor_options:
   chunk_output_type: console
 ---
 # for gene clustering with centered but without scaled, and then squre root transformation
+<<<<<<< HEAD
 # To Do
 * Cut tree for gene dendrogram
 * Add gene dendrogram to final figure
 # History
 * 
+=======
+>>>>>>> 4a0b970bd523cd086f5d8a2f7b8ca91641022bf2
 
 ```{r}
 library(tidyverse)
