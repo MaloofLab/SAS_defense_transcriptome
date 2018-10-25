@@ -1,0 +1,135 @@
+---
+title: "compare differentially expressed genes"
+author: "Chunmei Li"
+date: "2018年10月12日"
+output: html_document
+---
+
+```{r}
+#install.packages("VennDiagram")
+library(VennDiagram)
+library(tidyverse)
+library(readxl)
+```
+
+```{r}
+list.files(path=file.path("C:/Users/LCM/Documents/RNAseq files/differentially expressed gene list"))
+
+DEG.objs<-list.files(path=file.path("C:/Users/LCM/Documents/RNAseq files/differentially expressed gene list"),pattern="rH\\.csv$") # under construction
+DEG.objs
+```
+
+```{r}
+DEG.list<-lapply(DEG.objs, function(x) read_csv(paste(file.path("C:/Users/LCM/Documents/RNAseq files/differentially expressed gene list"),"/",x,sep="")))
+names(DEG.list)<-gsub(".csv","",DEG.objs)
+DEG.list
+```
+
+
+```{r}
+for (n in 1:14) {
+  
+  genes.up <- DEG.list[[n]]  %>%  dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))>0) %>% select(gene_id)
+  #names(genes.up) <- names(DEG.list[n])
+  genes.down <- DEG.list[[n]]  %>%  dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))<0) %>% select(gene_id)
+    save(genes.up,file=file.path("1012output",paste(names(DEG.list[n]),"up.Rdata",sep=".")))
+    save(genes.down,file=file.path("1012output",paste(names(DEG.list[n]),"down.Rdata",sep=".")))
+
+}
+```
+
+```{r}
+genes.up.files <- list.files(pattern="up.Rdata",path=file.path("1012output"))
+genes.down.files <- list.files(pattern="down.Rdata",path=file.path("1012output"))
+```
+
+```{r}
+genes.up.list <- sapply(file.path("1012output",genes.up.files),function(x) mget(load(x)))
+names(genes.up.list) <- paste(names(DEG.list), "up", sep = ".")
+#for (n in 1:14) {
+#  colnames(genes.up.list[[n]])[1] <- paste(names(DEG.list)[n], "up", sep = ".")
+  
+ # }
+
+genes.down.list <- sapply(file.path("1012output",genes.down.files),function(x) mget(load(x)))
+names(genes.down.list) <- paste(names(DEG.list), "down", sep = ".")
+
+```
+
+```{r}
+expressed.genes <- read_csv(file = file.path("C:/Users/LCM/Documents/RNAseq files/go_term_files/expressed_genes_counts.csv"))
+genes_id <- data.frame(matrix(ncol = 1, nrow = 17328))
+genes_id$matrix.ncol...1..nrow...17328.<-expressed.genes$target_id
+colnames(genes_id) <- "gene_id"
+
+
+data.overlap.up <- genes_id
+
+data.overlap.up$gene_id <- gsub("\\.\\d", "", data.overlap.up$gene_id)
+head(data.overlap.up)
+#data.overlap.up$V2
+#names(test) <- names(genes.up.list)[1]
+#head(test)
+
+for (n in 1:14) {
+data.overlap.up[,n+1] <- as.numeric(data.overlap.up$gene_id %in% genes.up.list[[n]]$gene_id)
+colnames(data.overlap.up)[n+1] <- names(genes.up.list)[n]
+}
+
+head(data.overlap.up, n=20)
+
+sum(data.overlap.up[, -1])
+```
+
+```{r}
+samples<- colnames(data.overlap.up)[-1]
+samples
+
+names(genes.down.list)
+names(genes.up.list)
+```
+
+```{r}
+venn.diagram(
+x = list(genes.up.list[[1]]$gene_id , genes.up.list[[4]]$gene_id , genes.down.list[[1]]$gene_id, genes.down.list[[4]]$gene_id),
+category.names = c("Col.up" , "myc234.up" , "Col.down", "myc234.down"),
+filename = "1h_regulated_genes_overlap.png",
+col = "black",
+lty = "dotted",
+lwd = 4,
+fill = c("cornflowerblue", "green", "yellow", "darkorchid1"),
+alpha = 0.50,
+label.col = c("orange", "white", "darkorchid4", "white", "white", "white",
+"white", "white", "darkblue", "white",
+"white", "white", "white", "darkgreen", "white"),
+cex = 1.5,
+fontfamily = "serif",
+fontface = "bold",
+cat.col = c("darkblue", "darkgreen", "orange", "darkorchid4"),
+cat.cex = 1.2,
+cat.fontfamily = "serif"
+        )
+```
+
+```{r}
+venn.diagram(
+x = list(genes.up.list[[2]]$gene_id , genes.up.list[[6]]$gene_id , genes.down.list[[2]]$gene_id, genes.down.list[[6]]$gene_id),
+category.names = c("Col.up" , "myc234.up" , "Col.down", "myc324.down"),
+filename = "49h_regulated_genes_overlap.png",
+col = "black",
+lty = "dotted",
+lwd = 4,
+fill = c("cornflowerblue", "green", "yellow", "darkorchid1"),
+alpha = 0.50,
+label.col = c("orange", "white", "darkorchid4", "white", "white", "white",
+"white", "white", "darkblue", "white",
+"white", "white", "white", "darkgreen", "white"),
+cex = 1.5,
+fontfamily = "serif",
+fontface = "bold",
+cat.col = c("darkblue", "darkgreen", "orange", "darkorchid4"),
+cat.cex = 1.2,
+cat.fontfamily = "serif"
+        )
+```
+

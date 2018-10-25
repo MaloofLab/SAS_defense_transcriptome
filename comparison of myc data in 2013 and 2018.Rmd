@@ -1,0 +1,66 @@
+---
+title: "comparison of myc data in 2013 and 2018"
+author: "Chunmei Li"
+date: "2018年10月19日"
+output: html_document
+---
+
+```{r}
+library(VennDiagram)
+library(tidyverse)
+```
+
+```{r}
+myc.1h <- read_csv(paste(file.path("C:/Users/LCM/Documents/RNAseq files/differentially expressed gene list/DEgenes.myc234.1h.rCol.rH.csv")))
+head(myc.1h)
+myc234.2weeks.1h.up <- (myc.1h %>% filter(logFC.gtmyc234 > 0))
+myc234.2weeks.1h.down <- myc.1h %>% filter(logFC.gtmyc234 < 0)
+myc.49h <- read_csv(paste(file.path("C:/Users/LCM/Documents/RNAseq files/differentially expressed gene list/DEgenes.myc234.49h.rCol.rH.csv")))
+head(myc.49h)
+myc234.2weeks.49h.up <- myc.49h %>% filter(logFC.gtmyc234 > 0) 
+myc234.2weeks.49h.down <- myc.49h %>% filter(logFC.gtmyc234 < 0)
+```
+
+```{r}
+getwd()
+myc.2013 <- read_excel("tpc115139SupplementalDS1.xlsx", skip = 4)
+head(myc.2013)
+myc.2013 <- myc.2013 %>% filter(adj.P.Val<0.05)
+myc.2013$`AGI Code` <- toupper(myc.2013$`AGI Code`)
+head(myc.2013)
+myc234.4weeks.up <- myc.2013 %>% filter(`Col-0/myc234` < 1)
+myc234.4weeks.down <- myc.2013 %>% filter(`Col-0/myc234` > 1)
+```
+
+```{r}
+venn.diagram(
+x = list(myc234.2weeks.1h.up$gene_id , myc234.2weeks.49h.up$gene_id , myc234.4weeks.up$`AGI Code`),
+category.names = c("2weeks.1h.up" , "2weeks.49h.up" , "4weeks.up"),
+filename = "up.overlap.png",
+col = "black",
+lty = "dotted",
+lwd = 3,
+fill = c("cornflowerblue", "green", "yellow"),
+alpha = 0.50,
+label.col = c("orange", "white", "darkorchid4", "white", "white", "white",
+"white", "white", "darkblue", "white",
+"white", "white", "white", "darkgreen", "white"),
+cex = 2.5,
+fontfamily = "serif",
+fontface = "bold",
+cat.col = c("darkblue", "darkgreen", "orange"),
+cat.cex = 2.5,
+cat.fontfamily = "serif"
+        )
+```
+
+```{r}
+df.venn <- data.frame(x = c(0, 0.866, -0.866),
+                      y = c(1, -0.5, -0.5),
+                      labels = c('A', 'B', 'C'))
+ggplot(df.venn, aes(x0 = x, y0 = y, r = 1.5, fill = labels)) +
+    geom_circle(alpha = .3, size = 1, colour = 'grey') +
+      coord_fixed() +
+        theme_void()
+```
+

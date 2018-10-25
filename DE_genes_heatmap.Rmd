@@ -1,12 +1,148 @@
 ---
 title: "DE_genes_heatmap"
 author: "Chunmei Li"
-date: "2018/10/23"
+date: "2018年10月23日"
 output: html_document
 ---
-#library package
+
 ```{r}
+
 library(tidyverse)
-library(ggdendro) ###no package called "ggdendro"
+library(ggdendro)
+
+library(plotly)
+```
+#import data
+```{r}
+Col.1h <- read.csv("C:/Users/LCM/Documents/RNAseq files/differentially expressed gene list/DEgenes.Col.1h.rH.csv")
+Col.49h <- read.csv("C:/Users/LCM/Documents/RNAseq files/differentially expressed gene list/DEgenes.Col.49h.rH.csv")
+myc234.1h <- read.csv("C:/Users/LCM/Documents/RNAseq files/differentially expressed gene list/DEgenes.myc234.1h.rH.csv")
+myc234.49h <- read.csv("C:/Users/LCM/Documents/RNAseq files/differentially expressed gene list/DEgenes.myc234.49h.rH.csv")
+myc234.1h.rCol <- read.csv("C:/Users/LCM/Documents/RNAseq files/differentially expressed gene list/DEgenes.myc234.1h.rCol.rH.csv")
+myc234.49h.rCol <- read.csv("C:/Users/LCM/Documents/RNAseq files/differentially expressed gene list/DEgenes.myc234.49h.rCol.rH.csv")
+
+head(Col.1h)
+```
+#import cpm
+```{r}
+load("C:/Users/LCM/Documents/RNAseq files/go_term_files/dge.Rdata")
+log2_cpm <- log2(cpm(dge.data)+1)
+head(log2_cpm)
+rownames(log2_cpm) <- gsub("\\.\\d", "", rownames(log2_cpm))
+
+#subset Col and myc234 data
+
+log2_cpm <- log2_cpm[, 1:32]
+head(log2_cpm)
+```
+
+#only keep the genes differentially expressed
+
+```{r}
+library(plyr)
+
+DEgenes <- join_all(list((Col.1h %>% filter(FDR<=0.01))[2],
+                         (Col.49h %>% filter(FDR<=0.01))[2],
+                         (myc234.1h %>% filter(FDR<=0.01))[2],
+                         (myc234.49h %>% filter(FDR<=0.01))[2], 
+                         (myc234.1h.rCol %>% filter(FDR<=0.01))[2], 
+                         (myc234.49h.rCol %>% filter(FDR<=0.01))[2]),
+                    by='gene_id', type='full')
+log2_cpm.DEgenes <- merge(log2_cpm, DEgenes, by.x="row.names", by.y="gene_id")
+
+log2_cpm.DEgenes <- log2_cpm.DEgenes %>% gather(2:33, key = "sample", value = "lo2_cpm") %>% separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_")
+
+head(log2_cpm.DEgenes)
+
+summary(log2_cpm.DEgenes)
+```
+
+```{r}
+detach(package:plyr)
+
+by_sample <- group_by(log2_cpm.DEgenes, Row.names, genotype, time_point, treatment)
+ave_log2_cpm <- summarise(by_sample, ave_log2_cpm = mean(lo2_cpm, na.rm = TRUE))
+```
+
+```{r}
+ave_log2_cpm <- as.data.frame(ave_log2_cpm) %>% unite("sample", genotype, time_point, treatment, sep = "_") %>% spread(key = sample, value = ave_log2_cpm) %>% column_to_rownames("Row.names")
+rownames(ave_log2_cpm)
+
+head(ave_log2_cpm)
+```
+```{r}
+x <- as.matrix(scale(t(ave_log2_cpm)))####i need to compare each genes in different sample, need to tran
+head(x)
+rowSums(x)
+head(colSums(x))
+```
+
+```{r}
+dd.col.gene <- as.dendrogram(hclust(dist(x)))
+dd.row.sample <- as.dendrogram(hclust(dist(t(x))))
+dx <- dendro_data(dd.row.sample)
+dy <- dendro_data(dd.col.gene)
+```
+
+```{r}
+ggdend <- function(df) {
+  ggplot() +
+    geom_segment(data = df, aes(x=x, y=y, xend=xend, yend=yend)) +
+    labs(x = "", y = "") + theme_minimal() +
+    theme(axis.text = element_blank(), axis.ticks = element_blank(),
+          panel.grid = element_blank())
+}
+
+# x/y dendograms
+px <- ggdend(dx$segments)
+py <- ggdend(dy$segments) + coord_flip()
+```
+
+
+
+
+
+```{r}
+# heatmap
+col.ord <- order.dendrogram(dd.col.gene)
+row.ord <- order.dendrogram(dd.row.sample)
+xx1 <- scale(t(ave_log2_cpm))[col.ord,row.ord]
+xx1_names <- attr(xx1, "dimnames")
+df <- as.data.frame(xx1)
+colnames(df) <- xx1_names[[2]]
+df$sample <- xx1_names[[1]]
+df$sample <- with(df, factor(sample, levels=sample, ordered=TRUE))
+mdf <- reshape2::melt(df, id.vars="sample")
+mdf$variable <- factor(mdf$variable, levels = xx1_names[[2]], ordered = T)
+p <- ggplot(mdf, aes(x = variable, y = sample)) + geom_tile(aes(fill = value)) +scale_fill_gradient2(low="green", mid = "black", high="magenta") + theme(axis.text.y=element_text(size=10),axis.text.x = element_blank(),axis.ticks.x = element_blank(),axis.title.x=element_text(size=10), legend.position = "top") + xlab("Differentially expressed genes") + ylab("sample")
+
+mat <- matrix(unlist(dplyr::select(df,-sample)),nrow=nrow(df))
+colnames(mat) <- colnames(df)[1:ncol(df)-1]
+rownames(mat) <- rownames(df)
+
+# hide axis ticks and grid lines
+eaxis <- list(
+  showticklabels = FALSE,
+  showgrid = FALSE,
+  zeroline = FALSE
+)
+
+p_empty <- plot_ly(filename="r-docs/dendrogram") %>%
+  # note that margin applies to entire plot, so we can
+  # add it here to make tick labels more readable
+  layout(margin = list(l = 200),
+         xaxis = eaxis,
+         yaxis = eaxis)
+
+ final.plot2 <- subplot(p,py, nrows = 1, margin = 0.01, widths = c(0.9,0.1), shareX = T,shareY = T)
+
+plotly_IMAGE(final.plot2, width = 1000, height = 500, format = "jpeg", scale = 2,
+             out_file = "DEgenes.heatmap.final.version.jpeg")
+
+library("grid")
+grid.newpage()
+#grid.draw(g)
+print(px1, vp = viewport(x = 0.90, y = 0.43, width = 0.2, height = 0.92))
+print(p, vp = viewport(x = 0.4, y = 0.5, width = 0.8, height = 1.0))
 ```
 
