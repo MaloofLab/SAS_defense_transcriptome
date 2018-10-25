@@ -7,6 +7,43 @@ editor_options:
 
 # Can you add processes from fastq (quality check by fastqc), trimming, and mapping to reference cDNA? (Kazu)
 
+## trim reads:
+/bin/hostname
+
+start=date +%s
+module load trimmomatic/0.33
+
+cd /share/malooflab/Fastqs/Chunmei/RNAseq
+
+trimming
+echo "My SLURM_ARRAY_TASK_ID: " $SLURM_ARRAY_TASK_ID
+sample=sed "${SLURM_ARRAY_TASK_ID}q;d" sample_list_trimming
+
+echo ${sample}
+outdir=/share/malooflab/Chunmei/trimmed
+
+trimmomatic SE -threads 4 ${sample}_L007_R1_001.fastq.gz $outdir/${sample}_trimmed.fq.gz ILLUMINACLIP:Bradseq_adapter.fa:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
+
+end=date +%s
+runtime=$((end-start))
+echo $runtime seconds to completion
+
+## mapping
+!/bin/bash
+start=date +%s
+
+Identify each array run
+cd ~/RNAseq/trimmed
+sample=cat sample_list_trimmed
+
+for i in $sample
+do echo $i
+kallisto quant -i --fr-stranded arabidopsis_cdna.idx -o ~/RNAseq/map_output2/${i}_output --single --plaintext -l 300 -s 100 ${i}
+done
+
+end=date +%s
+runtime=$((end-start))
+echo $runtime seconds to completion
 
 
 
