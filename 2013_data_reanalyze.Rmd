@@ -142,7 +142,12 @@ ggplot(df.venn, aes(x0 = x, y0 = y, r = 1.5, fill = labels)) +
     geom_circle(alpha = .3, size = 1, colour = 'grey') +
       coord_fixed() +
         theme_void()
+
+df.venn.down <- data.frame(x = c(0, 0.866, -0.866),
+                      y = c(1, -0.5, -0.5),
+                      labels = c('myc234.2weeks.1h.down', 'myc234.2weeks.49h.down', 'myc234.4weeks.down'))
 ```
+
 ```{r}
 expressed.genes <- read_csv("../output/expressed_genes_counts.csv")
 
@@ -208,7 +213,7 @@ df.vdc.down <- as.data.frame(vdc.down)[-1,] %>%
 ```
 
 ```{r}
-overlap.down <- ggplot(df.venn) +
+overlap.down <- ggplot(df.venn.down) +
   geom_circle(aes(x0 = x, y0 = y, r = 1.5, fill = labels), alpha = .3, size = 1, colour = 'grey') +
   coord_fixed() +
   theme_void() +
@@ -241,6 +246,97 @@ down.overlap.myc234 <- left_join(down.overlap,gene.description,by = c("target_id
 
 write.csv(up.overlap.myc234, file = "../output/up.overlap.myc234.csv")
 write.csv(down.overlap.myc234, file = "../output/down.overlap.myc234.csv")
+
+```
+
+##subset overlapped data 
+```{r}
+myc234.1h.49h.up <- up.overlap.myc234 %>% filter(myc234.2weeks.1h.up==1&myc234.2weeks.49h.up==1&myc234.4weeks.up==0)
+
+GOseq.Atgoslim.BP.list.ORA(myc234.1h.49h.up$target_id,custom.category.list=Atgoslim.TAIR.BP.list)
+```
+
+```{r}
+myc234.49h.up <- up.overlap.myc234 %>% filter(myc234.2weeks.1h.up==0&myc234.2weeks.49h.up==1&myc234.4weeks.up==0)
+
+GOseq.Atgoslim.BP.list.ORA(myc234.49h.up$target_id,custom.category.list=Atgoslim.TAIR.BP.list)
+```
+
+
+```{r}
+myc234.1h.49h.down <- down.overlap.myc234 %>% filter(myc234.2weeks.1h.down==1&myc234.2weeks.49h.down==1&myc234.4weeks.down==0)
+
+GOseq.Atgoslim.BP.list.ORA(myc234.1h.49h.down$target_id,custom.category.list=Atgoslim.TAIR.BP.list)
+```
+
+```{r}
+myc234.49h.down <- down.overlap.myc234 %>% filter(myc234.2weeks.1h.down==0&myc234.2weeks.49h.down==1&myc234.4weeks.down==0)
+
+GOseq.Atgoslim.BP.list.ORA(myc234.49h.down$target_id,custom.category.list=Atgoslim.TAIR.BP.list)
+```
+
+```{r}
+myc234.2.4weeks.down <- down.overlap.myc234 %>% filter(myc234.2weeks.1h.down==1&myc234.2weeks.49h.down==1&myc234.4weeks.down==1)
+
+GOseq.Atgoslim.BP.list.ORA(myc234.2.4weeks.down$target_id,custom.category.list=Atgoslim.TAIR.BP.list)
+```
+#hormone response
+```{r}
+load("../reference/At.hormone.responsive.list.Rdata")
+head(At.hormone.responsive.list)
+```
+#import expressed genes 
+
+```{r}
+expressed.genes <- read_csv("../output/expressed_genes_counts.csv")
+expressed.genes <- expressed.genes$target_id
+expressed.genes <- as.data.frame(expressed.genes)
+head(expressed.genes)
+colnames(expressed.genes) <- "gene_id"
+expressed.genes$gene_id <- gsub("\\.\\d", "", expressed.genes$gene_id)
+head(expressed.genes)
+```
+
+```{r}
+ # bias.data vector must have the same length as DEgenes vector! 
+## if you want to test expressed genes as background, add background in this function
+GOseq.At.customcat.ORA<-function(genelist,padjust=0.05,custom.category.list=At.hormone.responsive.list,cdna=At_cdna,background="") { # return GO enrichment table, padjus, padjust=0.05. New BLAST2GO results with only BP Brgo.v2.5.BP.list is used (042518). Brgo.v2.5.BP.list is based on Hajar's Blast2go, which should be replaced with Brgo.Atgoslim.BP.list and giving a new name to this function (080818). cdna is DNAstring object. background is a vector of genes.
+  #bias<-nchar(cdna)
+  bias<-Biostrings::width(cdna)
+  # add name to "bias". cdna
+  #names(bias)<-names(cdna)
+ names(bias) <- tibble(name=names(cdna)) %>% separate(name,into=c("name2","Symbol","description"),sep=" \\|",extra="drop",fill="left") %>%  mutate(AGI=gsub(pattern="\\.[[:digit:]]+", "", name2)) %>% pull(AGI)
+ if(background=="") {print("Use all genes in genome as background")} else {
+ # select only expressed geens 
+  bias <- bias[background$gene_id]
+  print("Expessed genes are used as background.")
+  print(paste("length of bias is ",length(bias)))
+ }
+  TF<-(names(bias) %in% genelist)*1
+  names(TF)<-names(bias)
+  #print(TF)
+  pwf<-nullp(TF,bias.data=bias)
+  #print(pwf$DEgenes)
+  GO.pval <- goseq(pwf,gene2cat=custom.category.list,use_genes_without_cat=TRUE) # format became different in new goseq version (021111). Does not work (042716)
+  # calculate p ajust by BH
+  GO.pval$over_represented_padjust<-p.adjust(GO.pval$over_represented_pvalue,method="BH")
+  if(GO.pval$over_represented_padjust[1]>padjust) return("no enriched GO")
+  else {
+    enriched.GO<-GO.pval[GO.pval$over_represented_padjust<padjust,] 
+    print("enriched.GO is")
+    print(enriched.GO)
+    return(enriched.GO)
+  }
+}
+```
+
+```{r}
+myc234.1h.49h.up <- up.overlap.myc234 %>% filter(myc234.2weeks.1h.up==1&myc234.2weeks.49h.up==1&myc234.4weeks.up==0)
+
+GOseq.At.customcat.ORA(myc234.49h.down$target_id, background = expressed.genes)
+```
+
+```{r}
 
 ```
 

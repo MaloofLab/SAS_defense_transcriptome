@@ -4,7 +4,13 @@ output: html_document
 ---
 
 ```{r}
-library(ShortRead);library(goseq);library(GO.db);library("annotate")
+library(ShortRead);library(goseq);library(GO.db);library("annotate")#use annotate to add terms for each GO category
+```
+
+```{r}
+library(limma)
+library(tidyverse)
+library(ggforce)
 ```
 
 
@@ -98,7 +104,7 @@ GOseq.Atgoslim.BP.list.ORA<-function(genelist,padjust=0.05,ontology="BP",custom.
 
 
 ```{r}
-DEG.objs2 <- list.files(path=file.path("..","output"), pattern = ".rH\\.csv")[c(1,2,3,5)]
+DEG.objs2 <- list.files(path=file.path("..","output"), pattern = ".rH\\.csv")[c(1,2,3,4,5,6)]
 ```
 
 
@@ -115,6 +121,39 @@ names(DEG.list)<-gsub(".csv","",DEG.objs2)
 names(DEG.list)
 
 ```
+#summary figure
+```{r}
+remove(summary.data)
+summary.data <- data.frame(matrix(nrow = 8, ncol = 4))
+colnames(summary.data) <- c("number_of_genes", "FC", "genotype", "time_point")
+for (n in 1:4) {
+summary.data$number_of_genes[n] <- nrow(DEG.list[[n]]%>% filter(DEG.list[[n]][3] > 0)) 
+summary.data$FC[n] <- "up"
+
+}
+
+for (n in 1:4) {
+summary.data$number_of_genes[n+4] <- nrow(DEG.list[[n]]%>% filter(DEG.list[[n]][3] < 0)) 
+summary.data$FC[n+4] <- "down"
+}
+ 
+summary.data$FC <- as.factor(summary.data$FC)
+levels(summary.data$FC)
+summary.data$FC <- relevel(summary.data$FC, ref = "up")
+summary.data$genotype <- c("Col", "Col", "myc234", "myc234", "Col", "Col", "myc234", "myc234")
+  
+summary.data$time_point <- c("1h", "49h", "1h", "49h", "1h", "49h", "1h", "49h")
+
+ p <- ggplot(summary.data) + geom_bar(stat="identity", aes(x=FC, y=number_of_genes, fill=FC)) + facet_grid(time_point~genotype) + theme(axis.title.x=element_blank(),legend.position = "none") + ylab("number of misregulated genes")
+ggsave(filename = file.path("../output/summary of misregulated genes.pdf"), p, height = 5, width = 5, units = "in")
+```
+
+# venn diagram
+
+```{r}
+vennDiagram()
+```
+
 
 
 #for double coeffecient, use only genotype coefficient
@@ -195,7 +234,12 @@ eGOseqs.list2.summary$over_represented_padjust[eGOseqs.list2.summary$over_repres
 # format x label
 #eGOseqs.list2.summary <- eGOseqs.list2.summary  %>% mutate(sample2=str_replace(sample,"trt.density","trt_density")) %>%  separate(sample2,into=c("tissue","factor","DEGs","model","ref_density","ref_soil"),sep="\\.") %>% mutate(ref_soil=str_remove(ref_soil,"r")) %>% mutate(ref_density=str_remove(ref_density,"r"))  %>% unite(density_FC,ref_density,FC) # simplify elements in "density_FC" column for simpler x label in heatmap
 # plot
-  GOseq.plot<-ggplot(eGOseqs.list2.summary,aes(x=sample_FC,y=term)) + geom_tile(aes(fill=-log10(over_represented_padjust)),colour="black")  + scale_fill_gradient2(limit=c(0,50),low=muted("green"), high=muted("magenta")) # OK
+eGOseqs.list2.summary <- separate(eGOseqs.list2.summary, "sample_FC", into = c("sample", "FC"), sep = "_")
+
+eGOseqs.list2.summary$sample <- gsub("DEgenes\\.", "", eGOseqs.list2.summary$sample)
+
+eGOseqs.list2.summary <- separate(eGOseqs.list2.summary, "sample", into = c("genotype", "time_point", "ref"))
+  GOseq.plot<-ggplot(eGOseqs.list2.summary,aes(x=time_point,y=term)) + facet_wrap(genotype~FC, ncol = 4)+ geom_tile(aes(fill=-log10(over_represented_padjust)),colour="black")  + scale_fill_gradient2(limit=c(0,50),low=muted("green"), high=muted("magenta")) # OK
 GOseq.plot<-GOseq.plot+     theme(axis.text.x=element_text(size=10,angle=90),
           axis.text.y=element_text(size=10),
           axis.title=element_text(size=10),
@@ -205,7 +249,7 @@ GOseq.plot<-GOseq.plot+     theme(axis.text.x=element_text(size=10,angle=90),
           axis.line=element_blank()) + labs(x="",y="",title="",fill="-log10\n pvalue")
 GOseq.plot
 
-ggsave(filename = "GO.enrich.heatmap.single.coef.myc.pdf", plot = GOseq.plot, path = "../output", height = 10, width = 10,units = "in")
+ggsave(filename = "GO.enrich.heatmap.single.coef.myc102218.pdf", plot = GOseq.plot, path = "../output", height = 10, width = 10,units = "in")
 ```
 #find out genes in each GO
 
@@ -453,10 +497,10 @@ eGOseqs.list2.summary <- eGOseqs.list2.summary %>% mutate(sample=gsub(".csv", ""
 df<-eGOseqs.list2.summary %>% dplyr::select(category,sample_FC,over_represented_padjust) %>% spread(sample_FC,over_represented_padjust,-1)
 
 df[df<1e-100]<-1e-100 # to avoid "Inf" after log10 transformation
-df<- df %>% mutate_at(vars(2:10) ,.funs=function(x) -log10(x))
+df<- df %>% mutate_at(vars(2:8) ,.funs=function(x) -log10(x))
 # df<- df %>% mutate_at(vars(2:11) ,.funs=-log10) # does not work
 df[is.na(df)]<-1
-df2<-df[,2:10]
+df2<-df[,2:8]
 rownames(df2)<-df$category
 hc<-stats::hclust(dist(df2), "ave") # only numbers
 hc$order
@@ -472,7 +516,22 @@ eGOseqs.list2.summary$over_represented_padjust[eGOseqs.list2.summary$over_repres
 # format x label
 #eGOseqs.list2.summary <- eGOseqs.list2.summary  %>% mutate(sample2=str_replace(sample,"trt.density","trt_density")) %>%  separate(sample2,into=c("tissue","factor","DEGs","model","ref_density","ref_soil"),sep="\\.") %>% mutate(ref_soil=str_remove(ref_soil,"r")) %>% mutate(ref_density=str_remove(ref_density,"r"))  %>% unite(density_FC,ref_density,FC) # simplify elements in "density_FC" column for simpler x label in heatmap
 # plot
-  GOseq.plot<-ggplot(eGOseqs.list2.summary,aes(x=sample_FC,y=category)) + geom_tile(aes(fill=-log10(over_represented_padjust)),colour="black")  + scale_fill_gradient2(limit=c(0,50),low=muted("green"), high=muted("magenta")) # OK
+eGOseqs.list2.summary <- separate(eGOseqs.list2.summary, "sample_FC", into = c("sample", "FC"), sep = "_")
+
+eGOseqs.list2.summary$sample <- gsub("DEgenes\\.", "", eGOseqs.list2.summary$sample)
+
+eGOseqs.list2.summary <- separate(eGOseqs.list2.summary, "sample", into = c("genotype", "time_point", "ref"))
+  #GOseq.plot<-ggplot(eGOseqs.list2.summary,aes(x=time_point,y=term)) + facet_wrap(genotype~FC, ncol = 4)+ geom_tile(aes(fill=-log10(over_represented_padjust)),colour="black")  + scale_fill_gradient2(limit=c(0,50),low=muted("green"), high=muted("magenta")) # OK
+#GOseq.plot<-GOseq.plot+     theme(axis.text.x=element_text(size=10,angle=90),
+          #axis.text.y=element_text(size=10),
+          #axis.title=element_text(size=10),
+          #axis.ticks = element_blank(),
+          #panel.background = element_rect(fill = "white",colour="black"),
+          #plot.title=element_text(size=20),
+          #axis.line=element_blank()) + labs(x="",y="",title="",fill="-log10\n pvalue")
+#GOseq.plot
+
+  GOseq.plot<-ggplot(eGOseqs.list2.summary,aes(x=time_point,y=category)) + facet_wrap(genotype~FC, ncol = 4)+ geom_tile(aes(fill=-log10(over_represented_padjust)),colour="black")  + scale_fill_gradient2(limit=c(0,50),low=muted("green"), high=muted("magenta")) # OK
 GOseq.plot<-GOseq.plot+     theme(axis.text.x=element_text(size=10,angle=90),
           axis.text.y=element_text(size=10),
           axis.title=element_text(size=10),
@@ -482,7 +541,7 @@ GOseq.plot<-GOseq.plot+     theme(axis.text.x=element_text(size=10,angle=90),
           axis.line=element_blank()) + labs(x="",y="",title="",fill="-log10\n pvalue")
 GOseq.plot
 
-ggsave(filename = "GO.enrich.heatmap.single.coef.hormone.responsive.all.pdf", plot = GOseq.plot, path = "../output", height = 5, width = 5,units = "in")
+ggsave(filename = "GO.enrich.heatmap.single.coef.hormone.responsive.102218.pdf", plot = GOseq.plot, path = "../output", height = 5, width = 5,units = "in")
 ```
 
 
