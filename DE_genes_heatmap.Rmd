@@ -4,6 +4,7 @@ author: "Chunmei Li"
 date: "2018年10月23日"
 output: html_document
 ---
+# Making gene clustering
 
 ```{r}
 
@@ -12,14 +13,14 @@ library(ggdendro)
 
 library(plotly)
 ```
-#import data
+#import data (stored in output folder)
 ```{r}
-Col.1h <- read.csv("C:/Users/LCM/Documents/RNAseq files/differentially expressed gene list/DEgenes.Col.1h.rH.csv")
-Col.49h <- read.csv("C:/Users/LCM/Documents/RNAseq files/differentially expressed gene list/DEgenes.Col.49h.rH.csv")
-myc234.1h <- read.csv("C:/Users/LCM/Documents/RNAseq files/differentially expressed gene list/DEgenes.myc234.1h.rH.csv")
-myc234.49h <- read.csv("C:/Users/LCM/Documents/RNAseq files/differentially expressed gene list/DEgenes.myc234.49h.rH.csv")
-myc234.1h.rCol <- read.csv("C:/Users/LCM/Documents/RNAseq files/differentially expressed gene list/DEgenes.myc234.1h.rCol.rH.csv")
-myc234.49h.rCol <- read.csv("C:/Users/LCM/Documents/RNAseq files/differentially expressed gene list/DEgenes.myc234.49h.rCol.rH.csv")
+Col.1h <- read.csv("../output/DEgenes.Col.1h.rH.csv")
+Col.49h <- read.csv("../output/DEgenes.Col.49h.rH.csv")
+myc234.1h <- read.csv("../output/DEgenes.myc234.1h.rH.csv")
+myc234.49h <- read.csv("../output/DEgenes.myc234.49h.rH.csv")
+myc234.1h.rCol <- read.csv("../output/DEgenes.myc234.1h.rCol.rH.csv")
+myc234.49h.rCol <- read.csv("../output/DEgenes.myc234.49h.rCol.rH.csv")
 
 head(Col.1h)
 ```
