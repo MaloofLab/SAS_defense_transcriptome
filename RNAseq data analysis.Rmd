@@ -5,7 +5,7 @@ editor_options:
   chunk_output_type: console
 ---
 
-# Can you add processes from fastq (quality check by fastqc), trimming, and mapping to reference cDNA? (Kazu)
+## mRNA isolaiton
 
 ## trim reads:
 /bin/hostname
@@ -28,7 +28,9 @@ end=date +%s
 runtime=$((end-start))
 echo $runtime seconds to completion
 
-## mapping
+## mapping (strand specific mapping because Chunmei used YourSeq Dual (FT & 3'-DGE) RNAseq Library Kits (BrAD seq) with FT (full-transcript sequencing) http://amaryllisnucleics.com/kits/dual-rnaseq-library-kit). 
+## Strand-specificity of mapped reads (without specifying --fr-stranded in kallisto ) was confirmed by looking bam files with IGV (see Trello). Mapped 
+
 #!/bin/bash
 
 start=`date +%s`
