@@ -20,12 +20,23 @@ library(plotly)
 ```
 #import data
 ```{r}
-Col.1h <- read.csv("../output/DEGs_with_description/DEgenes.Col.1h.rH.csv")
-Col.49h <- read.csv("../output/DEGs_with_description/DEgenes.Col.49h.rH.csv")
-myc234.1h <- read.csv("../output/DEGs_with_description/DEgenes.myc234.1h.rH.csv")
-myc234.49h <- read.csv("../output/DEGs_with_description/DEgenes.myc234.49h.rH.csv")
-myc234.1h.rCol <- read.csv("../output/DEGs_with_description/DEgenes.myc234.1h.rCol.rH.csv")
-myc234.49h.rCol <- read.csv("../output/DEGs_with_description/DEgenes.myc234.49h.rCol.rH.csv")
+if(Sys.info()["user"]=="nozue") { 
+Col.1h <- read.csv(file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.Col.1h.rH.csv"))
+Col.49h <- read.csv(file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.Col.49h.rH.csv"))
+myc234.1h <- read.csv(file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.1h.rH.csv"))
+myc234.49h <- read.csv(file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.49h.rH.csv"))
+myc234.1h.rCol <- read.csv(file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.1h.rCol.rH.csv"))
+myc234.49h.rCol <- read.csv(file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.49h.rCol.rH.csv"))
+}
+# for Chunmei
+if(Sys.info()["user"]=="LCM") { 
+Col.1h <- read.csv(file.path("C","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.Col.1h.rH.csv"))
+Col.49h <- read.csv(file.path("C","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.Col.49h.rH.csv"))
+myc234.1h <- read.csv(file.path("C","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.1h.rH.csv"))
+myc234.49h <- read.csv(file.path("C","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.49h.rH.csv"))
+myc234.1h.rCol <- read.csv(file.path("C","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.1h.rCol.rH.csv"))
+myc234.49h.rCol <- read.csv(file.path("C","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.49h.rCol.rH.csv"))
+}
 
 head(Col.1h)
 ```
@@ -46,6 +57,7 @@ head(log2_cpm)
 
 ```{r}
 library(plyr)
+
 DEgenes <- plyr::join_all(list((Col.1h %>% filter(FDR<=0.01))[2],
                          (Col.49h %>% filter(FDR<=0.01))[2],
                          (myc234.1h %>% filter(FDR<=0.01))[2],
@@ -125,10 +137,12 @@ eaxis <- list(
   showgrid = FALSE,
   zeroline = FALSE
 )
-# for accessing plot.ly
-Sys.setenv("plotly_username"="knozue")
-Sys.setenv("plotly_api_key" = "KKbg9Oe9ETsNXMlPZOix")
-
+# for accessing plot.ly (Kazu's account)
+# Sign in https://plot.ly/#/
+# Check your email from plot.ly and verify your signup.
+#Sys.setenv("plotly_username"="my user ID")
+#Sys.setenv("plotly_api_key" = "my API key")
+# 
 p_empty <- plot_ly(filename="r-docs/dendrogram") %>%
   # note that margin applies to entire plot, so we can
   # add it here to make tick labels more readable
@@ -137,10 +151,17 @@ p_empty <- plot_ly(filename="r-docs/dendrogram") %>%
          yaxis = eaxis)
 
  final.plot2 <- subplot(p,py, nrows = 1, margin = 0.01, widths = c(0.9,0.1), shareX = T,shareY = T)
-
+# fo Kazu
+ if(Sys.info()["user"]=="nozue") { 
 plotly_IMAGE(final.plot2, width = 1000, height = 500, format = "jpeg", scale = 2,
-             out_file = "../output/figures_and_tables/DEgenes.heatmap.final.version.scale.false.jpeg")
-
+             out_file = file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output","figures_and_tables","DEgenes.heatmap.final.version.scale.false.jpeg"))
+ }
+# for Chunmei
+ if(Sys.info()["user"]=="LCM") { 
+plotly_IMAGE(final.plot2, width = 1000, height = 500, format = "jpeg", scale = 2,
+             out_file = file.path("C","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","figures_and_tables","DEgenes.heatmap.final.version.scale.false.jpeg"))
+}
+ 
 library("grid")
 grid.newpage()
 #grid.draw(g)
