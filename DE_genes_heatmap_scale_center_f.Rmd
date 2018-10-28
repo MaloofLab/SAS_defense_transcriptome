@@ -140,8 +140,13 @@ eaxis <- list(
 # for accessing plot.ly (Kazu's account)
 # Sign in https://plot.ly/#/
 # Check your email from plot.ly and verify your signup.
+<<<<<<< HEAD
 #Sys.setenv("plotly_username"="my user ID")
 #Sys.setenv("plotly_api_key" = "my API key")
+=======
+Sys.setenv("plotly_username"="knozue")
+Sys.setenv("plotly_api_key" = "KKbg9Oe9ETsNXMlPZOix")
+>>>>>>> cfbe6190eaafc50ccaa17da6e8d0881848326323
 # 
 p_empty <- plot_ly(filename="r-docs/dendrogram") %>%
   # note that margin applies to entire plot, so we can
