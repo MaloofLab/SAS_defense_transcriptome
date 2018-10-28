@@ -137,14 +137,14 @@ eaxis <- list(
   showgrid = FALSE,
   zeroline = FALSE
 )
-# for accessing plot.ly (Kazu's account)
+# for accessing plot.ly
 # Sign in https://plot.ly/#/
 # Check your email from plot.ly and verify your signup.
 #Sys.setenv("plotly_username"="my user ID")
 #Sys.setenv("plotly_api_key" = "my API key")
 
 # 
-p_empty <- plot_ly(filename="r-docs/dendrogram") %>%
+p_empty <- plot_ly() %>%
   # note that margin applies to entire plot, so we can
   # add it here to make tick labels more readable
   layout(margin = list(l = 200),
