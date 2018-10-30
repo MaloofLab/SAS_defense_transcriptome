@@ -45,7 +45,7 @@ head(Col.1h)
 
 # fo Kazu
  if(Sys.info()["user"]=="nozue") { 
-load(file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output","figures_and_tables","DEgenes.heatmap.final.version.scale.false.jpeg"))
+load(file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output/dge.Rdata"))
  }
 # for Chunmei
  if(Sys.info()["user"]=="LCM") { 
