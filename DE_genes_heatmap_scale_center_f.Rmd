@@ -30,19 +30,29 @@ myc234.49h.rCol <- read.csv(file.path("~","Box","Chunmei_Myc_Paper","manuscripts
 }
 # for Chunmei
 if(Sys.info()["user"]=="LCM") { 
-Col.1h <- read.csv(file.path("C","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.Col.1h.rH.csv"))
-Col.49h <- read.csv(file.path("C","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.Col.49h.rH.csv"))
-myc234.1h <- read.csv(file.path("C","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.1h.rH.csv"))
-myc234.49h <- read.csv(file.path("C","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.49h.rH.csv"))
-myc234.1h.rCol <- read.csv(file.path("C","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.1h.rCol.rH.csv"))
-myc234.49h.rCol <- read.csv(file.path("C","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.49h.rCol.rH.csv"))
+Col.1h <- read.csv(file.path("C:","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.Col.1h.rH.csv"))
+Col.49h <- read.csv(file.path("C:","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.Col.49h.rH.csv"))
+myc234.1h <- read.csv(file.path("C:","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.1h.rH.csv"))
+myc234.49h <- read.csv(file.path("C:","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.49h.rH.csv"))
+myc234.1h.rCol <- read.csv(file.path("C:","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.1h.rCol.rH.csv"))
+myc234.49h.rCol <- read.csv(file.path("C:","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.49h.rCol.rH.csv"))
 }
 
 head(Col.1h)
 ```
 #import cpm
 ```{r}
-load("../output/dge.Rdata")
+
+# fo Kazu
+ if(Sys.info()["user"]=="nozue") { 
+load(file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output","figures_and_tables","DEgenes.heatmap.final.version.scale.false.jpeg"))
+ }
+# for Chunmei
+ if(Sys.info()["user"]=="LCM") { 
+load(file.path("C:","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output/dge.Rdata"))
+ }
+
+
 log2_cpm <- log2(cpm(dge.data)+1)
 head(log2_cpm)
 rownames(log2_cpm) <- gsub("\\.\\d", "", rownames(log2_cpm))
@@ -109,6 +119,8 @@ ggdend <- function(df) {
 
 # x/y dendograms
 px <- ggdend(dx$segments)
+##cut the dendogram by height at 3.5
+px1 <- ggdend(dendro_data(cut(dd.row.sample, h=3)$upper)$segments)
 py <- ggdend(dy$segments) + coord_flip()
 ```
 # drawing clustering heatmap with plot_ly
@@ -150,8 +162,9 @@ p_empty <- plot_ly() %>%
   layout(margin = list(l = 200),
          xaxis = eaxis,
          yaxis = eaxis)
-
- final.plot2 <- subplot(p,py, nrows = 1, margin = 0.01, widths = c(0.9,0.1), shareX = T,shareY = T)
+#cut tree, but it's not flat
+final.plot1 <- subplot(px1,p_empty,p, py, nrows = 2, margin = 0.01, widths = c(0.9,0.1), shareX = T,shareY = T)
+ final.plot2 <- subplot(px,p_empty,p, py, nrows = 2, margin = 0.01, widths = c(0.9,0.1), shareX = T,shareY = T)
 # fo Kazu
  if(Sys.info()["user"]=="nozue") { 
 plotly_IMAGE(final.plot2, width = 1000, height = 500, format = "jpeg", scale = 2,
@@ -160,7 +173,7 @@ plotly_IMAGE(final.plot2, width = 1000, height = 500, format = "jpeg", scale = 2
 # for Chunmei
  if(Sys.info()["user"]=="LCM") { 
 plotly_IMAGE(final.plot2, width = 1000, height = 500, format = "jpeg", scale = 2,
-             out_file = file.path("C","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","figures_and_tables","DEgenes.heatmap.final.version.scale.false.jpeg"))
+             out_file = file.path("C:","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","figures_and_tables","DEgenes.heatmap.final.version.scale.false.jpeg"))
 }
  
 library("grid")
