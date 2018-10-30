@@ -17,6 +17,7 @@ editor_options:
 library(tidyverse)
 library(ggdendro)
 library(plotly)
+library(edgeR)
 ```
 #import data
 ```{r}
