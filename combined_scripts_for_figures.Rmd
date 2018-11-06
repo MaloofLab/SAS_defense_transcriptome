@@ -1,0 +1,549 @@
+---
+title: "combined_scripts_for_figures"
+author: "Chunmei Li"
+date: "2018年11月4日"
+output: html_document
+---
+
+#Figure 1. summary of RNA-seq results
+##figure 1 panel A. heatmap for diferentially expressed genes in each sample
+
+###package needed
+```{r}
+library(tidyverse)
+library(ggdendro)
+library(plotly)
+library(edgeR)
+```
+###import data
+```{r}
+if(Sys.info()["user"]=="nozue") { 
+Col.1h <- read.csv(file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.Col.1h.rH.csv"))
+Col.49h <- read.csv(file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.Col.49h.rH.csv"))
+myc234.1h <- read.csv(file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.1h.rH.csv"))
+myc234.49h <- read.csv(file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.49h.rH.csv"))
+myc234.1h.rCol <- read.csv(file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.1h.rCol.rH.csv"))
+myc234.49h.rCol <- read.csv(file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.49h.rCol.rH.csv"))
+}
+# for Chunmei
+if(Sys.info()["user"]=="LCM") { 
+Col.1h <- read.csv(file.path("C:","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.Col.1h.rH.csv"))
+Col.49h <- read.csv(file.path("C:","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.Col.49h.rH.csv"))
+myc234.1h <- read.csv(file.path("C:","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.1h.rH.csv"))
+myc234.49h <- read.csv(file.path("C:","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.49h.rH.csv"))
+myc234.1h.rCol <- read.csv(file.path("C:","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.1h.rCol.rH.csv"))
+myc234.49h.rCol <- read.csv(file.path("C:","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","DEGs_with_description","DEgenes.myc234.49h.rCol.rH.csv"))
+}
+
+
+```
+###import dge.data and calculate cpm
+```{r}
+
+# fo Kazu
+ if(Sys.info()["user"]=="nozue") { 
+load(file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output/dge.Rdata"))
+ }
+# for Chunmei
+ if(Sys.info()["user"]=="LCM") { 
+load(file.path("C:","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output/dge.Rdata"))
+ }
+
+
+log2_cpm <- log2(cpm(dge.data)+1)
+head(log2_cpm)
+rownames(log2_cpm) <- gsub("\\.\\d", "", rownames(log2_cpm)) #remove ".digital" after each AGI number
+
+#subset to keep Col and myc234 data
+
+log2_cpm <- log2_cpm[, 1:32]
+head(log2_cpm)
+```
+
+###keep the genes differentially expressed
+
+```{r}
+library(plyr)
+#only keep the differentially expressed genes at FDR<= 0.01
+DEgenes <- plyr::join_all(list((Col.1h %>% filter(FDR<=0.01))[2],
+                         (Col.49h %>% filter(FDR<=0.01))[2],
+                         (myc234.1h %>% filter(FDR<=0.01))[2],
+                         (myc234.49h %>% filter(FDR<=0.01))[2], 
+                         (myc234.1h.rCol %>% filter(FDR<=0.01))[2], 
+                         (myc234.49h.rCol %>% filter(FDR<=0.01))[2]), 
+                    by='gene_id', type='full')
+log2_cpm.DEgenes <- merge(log2_cpm, DEgenes, by.x="row.names", by.y="gene_id")
+# change formats
+log2_cpm.DEgenes <- log2_cpm.DEgenes %>% gather(2:33, key = "sample", value = "lo2_cpm") %>% separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_")
+head(log2_cpm.DEgenes)
+summary(log2_cpm.DEgenes)
+detach(package:plyr) #group_by function doesn't work when plyr exists
+```
+### calculate average expression value by replicates
+```{r}
+by_sample <- group_by(log2_cpm.DEgenes, Row.names, genotype, time_point, treatment)
+ave_log2_cpm <- summarise(by_sample, ave_log2_cpm = mean(lo2_cpm, na.rm = TRUE))
+```
+# 
+```{r}
+ave_log2_cpm <- as.data.frame(ave_log2_cpm) %>% unite("sample", genotype, time_point, treatment, sep = "_") %>% spread(key = sample, value = ave_log2_cpm) %>% column_to_rownames("Row.names")
+
+head(ave_log2_cpm)
+
+```
+### centered but not scaled data
+```{r}
+x <- as.matrix(scale(t(ave_log2_cpm), center=T, scale=F))####compare each gene in different sample, need to tranpose data by t() function
+head(x)
+rowSums(x) #sum value within each sample
+head(colSums(x)) # has to be zero within each gene, close to 0
+```
+### making dendrogram by hclust package
+```{r}
+dd.col.gene <- as.dendrogram(hclust(dist(x)))
+dd.row.sample <- as.dendrogram(hclust(dist(t(x))))
+dx <- dendro_data(dd.row.sample)
+dy <- dendro_data(dd.col.gene)
+```
+### helper function ggdend
+```{r}
+ggdend <- function(df) {
+  ggplot() +
+    geom_segment(data = df, aes(x=x, y=y, xend=xend, yend=yend)) +
+    labs(x = "", y = "") + theme_minimal() +
+    theme(axis.text = element_blank(), axis.ticks = element_blank(),
+          panel.grid = element_blank())
+}
+
+# x/y dendograms
+px <- ggdend(dx$segments)
+##cut the dendogram by height at 3.5
+#px1 <- ggdend(dendro_data(cut(dd.row.sample, h=3)$upper)$segments)
+py <- ggdend(dy$segments) + coord_flip()
+```
+### drawing clustering heatmap with plot_ly
+```{r}
+# heatmap
+col.ord <- order.dendrogram(dd.col.gene)
+row.ord <- order.dendrogram(dd.row.sample)
+xx1 <- scale(t(ave_log2_cpm), center=T, scale=F)[col.ord,row.ord]
+xx1_names <- attr(xx1, "dimnames")
+df <- as.data.frame(xx1)
+colnames(df) <- xx1_names[[2]]
+df$sample <- xx1_names[[1]]
+df$sample <- with(df, factor(sample, levels=sample, ordered=TRUE))
+mdf <- reshape2::melt(df, id.vars="sample")
+mdf$variable <- factor(mdf$variable, levels = xx1_names[[2]], ordered = T)
+mdf$Value <- sqrt(abs(mdf$value))*sign(mdf$value) # transforming data by sqrt() plus giving + or - by sign()
+p <- ggplot(mdf, aes(x = variable, y = sample)) + geom_tile(aes(fill = Value)) +scale_fill_gradient2(low="green", mid="black", high="magenta") + theme(axis.text.y=element_text(size=10),axis.text.x = element_blank(),axis.ticks.x = element_blank(),axis.title.x=element_text(size=10), legend.position = "top") + xlab("Differentially expressed genes") + ylab("sample")
+
+mat <- matrix(unlist(dplyr::select(df,-sample)),nrow=nrow(df))
+colnames(mat) <- colnames(df)[1:ncol(df)-1]
+rownames(mat) <- rownames(df)
+
+# hide axis ticks and grid lines
+eaxis <- list(
+  showticklabels = FALSE,
+  showgrid = FALSE,
+  zeroline = FALSE
+)
+# for accessing plot.ly
+# Sign in https://plot.ly/#/
+# Check your email from plot.ly and verify your signup.
+#Sys.setenv("plotly_username"="my user ID")
+#Sys.setenv("plotly_api_key" = "my API key")
+
+# 
+p_empty <- plot_ly() %>%
+  # note that margin applies to entire plot, so we can
+  # add it here to make tick labels more readable
+  layout(margin = list(l = 200),
+         xaxis = eaxis,
+         yaxis = eaxis)
+
+
+ final.plot2 <- subplot(px,p_empty,p, py, nrows = 2, margin = 0.01, widths = c(0.9,0.1), shareX = T,shareY = T)
+# for Kazu
+ if(Sys.info()["user"]=="nozue") { 
+plotly_IMAGE(final.plot2, width = 1000, height = 500, format = "jpeg", scale = 2,
+             out_file = file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output","figures_and_tables","DEgenes.heatmap.final.version.scale.false.jpeg"))
+ }
+# for Chunmei
+ if(Sys.info()["user"]=="LCM") { 
+plotly_IMAGE(final.plot2, width = 1000, height = 500, format = "jpeg", scale = 2,
+             out_file = file.path("C:","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output","figures_and_tables","DEgenes.heatmap.final.version.scale.false.jpeg"))
+ }
+```
+ 
+ 
+
+##figure 1 panel B. ●	Numbers of genes misregulated in Col, and myc234 overlap at 1h and 49h  shade treatment
+
+
+
+```{r}
+#packages needed
+
+library(VennDiagram)
+library(tidyverse)
+library(readxl)
+```
+
+```{r}
+#list all the files under the directory
+list.files(path=file.path("C:/Users/LCM/Box/Chunmei_Myc_Paper/manuscripts/output/DEGs_with_description"))
+
+DEG.objs<-list.files(path=file.path("C:/Users/LCM/Box/Chunmei_Myc_Paper/manuscripts/output/DEGs_with_description"),pattern="rH\\.csv$")[c(1,2,4,6)] # this is to only retain the Col and myc234 data compared to sun condition
+DEG.objs
+```
+
+```{r}
+#read the CSV files
+DEG.list<-lapply(DEG.objs, function(x) read_csv(paste(file.path("C:/Users/LCM/Box/Chunmei_Myc_Paper/manuscripts/output/DEGs_with_description"),"/",x,sep="")))
+names(DEG.list)<-gsub(".csv","",DEG.objs)
+DEG.list
+```
+
+
+```{r}
+#separate differentially expressed genes into up and down regulated.
+getwd()
+for (n in 1:4) {
+  
+  genes.up <- DEG.list[[n]]  %>%  dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))>0) %>% select(gene_id)
+  #names(genes.up) <- names(DEG.list[n])
+  genes.down <- DEG.list[[n]]  %>%  dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))<0) %>% select(gene_id)
+    save(genes.up,file=file.path("C:/Users/LCM/Box/Chunmei_Myc_Paper/manuscripts/output",paste(names(DEG.list[n]),"up.Rdata",sep=".")))
+    save(genes.down,file=file.path("C:/Users/LCM/Box/Chunmei_Myc_Paper/manuscripts/output",paste(names(DEG.list[n]),"down.Rdata",sep=".")))
+
+}
+```
+
+```{r}
+genes.up.files <- list.files(pattern="up.Rdata",path=file.path("C:/Users/LCM/Box/Chunmei_Myc_Paper/manuscripts/output"))
+genes.down.files <- list.files(pattern="down.Rdata",path=file.path("C:/Users/LCM/Box/Chunmei_Myc_Paper/manuscripts/output"))
+```
+
+```{r}
+genes.up.list <- sapply(file.path("C:/Users/LCM/Box/Chunmei_Myc_Paper/manuscripts/output",genes.up.files),function(x) mget(load(x)))
+names(genes.up.list) <- paste(names(DEG.list), "up", sep = ".")
+
+
+genes.down.list <- sapply(file.path("C:/Users/LCM/Box/Chunmei_Myc_Paper/manuscripts/output",genes.down.files),function(x) mget(load(x)))
+names(genes.down.list) <- paste(names(DEG.list), "down", sep = ".")
+
+```
+
+
+
+```{r}
+names(genes.down.list)
+names(genes.up.list)
+```
+
+```{r}
+venn.diagram(
+x = list(genes.up.list[[1]]$gene_id , genes.up.list[[3]]$gene_id , genes.down.list[[1]]$gene_id, genes.down.list[[3]]$gene_id),
+category.names = c("Col.up" , "myc234.up" , "Col.down", "myc234.down"),
+filename = file.path("C:/Users/LCM/Box/Chunmei_Myc_Paper/manuscripts/output","1h_regulated_genes_overlap.png"),
+col = "black",
+lty = "dotted",
+lwd = 4,
+fill = c("cornflowerblue", "green", "yellow", "darkorchid1"),
+alpha = 0.50,
+label.col = c("orange", "white", "darkorchid4", "white", "white", "white",
+"white", "white", "darkblue", "white",
+"white", "white", "white", "darkgreen", "white"),
+cex = 1.5,
+fontfamily = "serif",
+fontface = "bold",
+cat.col = c("darkblue", "darkgreen", "orange", "darkorchid4"),
+cat.cex = 1.2,
+cat.fontfamily = "serif"
+        )
+```
+
+```{r}
+venn.diagram(
+x = list(genes.up.list[[2]]$gene_id , genes.up.list[[4]]$gene_id , genes.down.list[[2]]$gene_id, genes.down.list[[4]]$gene_id),
+category.names = c("Col.up" , "myc234.up" , "Col.down", "myc324.down"),
+filename = file.path("C:/Users/LCM/Box/Chunmei_Myc_Paper/manuscripts/output","49h_regulated_genes_overlap.png"),
+col = "black",
+lty = "dotted",
+lwd = 4,
+fill = c("cornflowerblue", "green", "yellow", "darkorchid1"),
+alpha = 0.50,
+label.col = c("orange", "white", "darkorchid4", "white", "white", "white",
+"white", "white", "darkblue", "white",
+"white", "white", "white", "darkgreen", "white"),
+cex = 1.5,
+fontfamily = "serif",
+fontface = "bold",
+cat.col = c("darkblue", "darkgreen", "orange", "darkorchid4"),
+cat.cex = 1.2,
+cat.fontfamily = "serif"
+        )
+```
+
+#Figure 2 heatmap for GO terms enrichment analysis.
+```{r}
+getwd()
+source("http://bioconductor.org/biocLite.R")
+biocLite("ShortRead")
+source("http://bioconductor.org/biocLite.R")
+biocLite("annotate")
+source("http://bioconductor.org/biocLite.R")
+biocLite("hwriter")
+library(ShortRead);library(goseq);library(GO.db);library("annotate")#use annotate to add terms for each GO category
+```
+
+```{r}
+library(limma)
+library(tidyverse)
+source("http://bioconductor.org/biocLite.R")
+install.packages("ggforce")
+biocLite("ggforce")
+library(ggforce)
+```
+
+
+```{r}
+getwd()
+At_cdna<-Biostrings::readDNAStringSet("../reference/TAIR10_cdna_20110103_representative_gene_model_updated.1")
+At_cdna
+
+```
+
+
+```{r}
+Atgoslim.TAIR<-read_tsv("../reference/ATH_GO_GOSLIM.txt",skip=2,col_names = FALSE )
+```
+```{r}
+load("../reference/At.hormone.responsive.list.Rdata")
+head(At.hormone.responsive.list)
+```
+
+
+```{r}
+head(Atgoslim.TAIR)
+Atgoslim.TAIR %>% filter(X8=="P",X1=="AT4G38360") %>% dplyr::select(1,5,6,8,9,10)###what does this mean? means BP  biological process
+Atgoslim.TAIR.BP <-Atgoslim.TAIR%>% filter(X8=="P")
+head(Atgoslim.TAIR.BP)
+Atgoslim.TAIR.BP.list<-tapply(Atgoslim.TAIR.BP$X6,Atgoslim.TAIR.BP$X1,c)
+head(Atgoslim.TAIR.BP.list)
+#save(Atgoslim.TAIR.BP.list, list,file=file.path("../output","Atgoslim.TAIR.BP.list.Rdata"))
+
+Atgoslim.TAIR.CC <-Atgoslim.TAIR%>% filter(X8=="C")
+head(Atgoslim.TAIR.CC)
+Atgoslim.TAIR.CC.list<-tapply(Atgoslim.TAIR.CC$X6,Atgoslim.TAIR.CC$X1,c)
+head(Atgoslim.TAIR.CC.list)
+#save(Atgoslim.TAIR.CC.list, list,file=file.path("../output","Atgoslim.TAIR.CC.list.Rdata"))
+```
+#import expressed genes 
+
+```{r}
+expressed.genes <- read_csv("../output/expressed_genes_counts.csv")
+expressed.genes <- expressed.genes$target_id
+expressed.genes <- as.data.frame(expressed.genes)
+head(expressed.genes)
+colnames(expressed.genes) <- "gene_id"
+expressed.genes$gene_id <- gsub("\\.\\d", "", expressed.genes$gene_id)
+head(expressed.genes)
+```
+
+
+
+```{r}
+GOseq.Atgoslim.BP.list.ORA<-function(genelist,padjust=0.05,ontology="BP",custom.category.list=Atgoslim.TAIR.BP.list,cdna=At_cdna,expressed.genes=expressed.genes) { # return GO enrichment table, padjus, padjust=0.05. 
+  bias<-nchar(cdna)#to get the length of each gene
+  names(bias)<-tibble(AGI=names(cdna)) %>% separate(AGI,into="AGI2",pattern="|",extra="drop") %>% dplyr::select(AGI2) %>% as_vector()# to get the AGI of each gene
+  table(duplicated(names(bias)))# to see if there is duplicated AGI
+  #TF<-(names(bias) %in% genelist)*1
+  bias <- bias[names(bias)%in%expressed.genes$gene_id] # use only expressed genes in the experiment as reference
+  TF<-as.integer(names(bias) %in% genelist)
+  names(TF)<-names(bias)
+  #print(TF)
+  pwf<-nullp(TF,bias.data=bias)
+  #print(pwf$DEgenes)
+  GO.pval <- goseq(pwf,gene2cat=custom.category.list,use_genes_without_cat=TRUE) # format became different in new goseq version (021111). Does not work (042716)
+  #head(GO.pval) 
+  if(ontology=="BP") {
+    GO.pval2<-subset(GO.pval,ontology=="BP")
+  } else if(ontology=="CC") {
+    GO.pval2<-subset(GO.pval,ontology=="CC")
+  } else {
+    GO.pval2<-subset(GO.pval,ontology=="MF")
+  }
+  # calculating padjust by BH  
+  GO.pval2$over_represented_padjust<-p.adjust(GO.pval2$over_represented_pvalue,method="BH")
+  if(GO.pval2$over_represented_padjust[1]>padjust) return("no enriched GO")
+  else {
+    enriched.GO<-GO.pval2[GO.pval2$over_represented_padjust<padjust,] 
+    print("enriched.GO is")
+    print(enriched.GO)
+    
+    ## write Term and Definition 
+    for(i in 1:dim(enriched.GO)[1]) {
+      if(is.null(Term(GOTERM[enriched.GO[i,"category"]]))) {next} else {
+      enriched.GO$Term[i]<-Term(GOTERM[[enriched.GO[i,"category"]]])
+      enriched.GO$Definition[i]<-Definition(GOTERM[[enriched.GO[i,"category"]]])
+      }
+    }
+    return(enriched.GO)
+  }
+}
+
+```
+
+
+```{r}
+DEG.objs2 <- list.files(path=file.path("..","output"), pattern = ".rH\\.csv")[c(1,2,3,4,5,6)]
+```
+
+
+```{r}
+# read csv file
+DEG.list<-lapply(DEG.objs2, function(x) read_csv(paste(file.path("..","output"),"/",x,sep="")))
+names(DEG.list)<-gsub(".csv","",DEG.objs2)
+
+
+```
+
+```{r}
+# single coefficient
+names(DEG.list)
+
+```
+#summary figure
+```{r}
+remove(summary.data)
+summary.data <- data.frame(matrix(nrow = 8, ncol = 4))
+colnames(summary.data) <- c("number_of_genes", "FC", "genotype", "time_point")
+for (n in 1:4) {
+summary.data$number_of_genes[n] <- nrow(DEG.list[[n]]%>% filter(DEG.list[[n]][3] > 0)) 
+summary.data$FC[n] <- "up"
+
+}
+
+for (n in 1:4) {
+summary.data$number_of_genes[n+4] <- nrow(DEG.list[[n]]%>% filter(DEG.list[[n]][3] < 0)) 
+summary.data$FC[n+4] <- "down"
+}
+ 
+summary.data$FC <- as.factor(summary.data$FC)
+levels(summary.data$FC)
+summary.data$FC <- relevel(summary.data$FC, ref = "up")
+summary.data$genotype <- c("Col", "Col", "myc234", "myc234", "Col", "Col", "myc234", "myc234")
+  
+summary.data$time_point <- c("1h", "49h", "1h", "49h", "1h", "49h", "1h", "49h")
+
+ p <- ggplot(summary.data) + geom_bar(stat="identity", aes(x=FC, y=number_of_genes, fill=FC)) + facet_grid(time_point~genotype) + theme(axis.title.x=element_blank(),legend.position = "none") + ylab("number of misregulated genes")
+ggsave(filename = file.path("../output/summary of misregulated genes.pdf"), p, height = 5, width = 5, units = "in")
+```
+
+# venn diagram
+
+```{r}
+vennDiagram()
+```
+
+
+
+#for double coeffecient, use only genotype coefficient
+
+only use the genotype FC 
+```{r}
+for(n in c(1:4)) {
+library(dplyr)
+  
+genelist.up<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))>0)
+genelist.down<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))<0)
+    GO.ORA.temp.up<-GOseq.Atgoslim.BP.list.ORA(gsub("\\.[[:digit:]]+", "", as_vector(genelist.up[,"gene_id"])),custom.category.list=Atgoslim.TAIR.BP.list, expressed.genes = expressed.genes)
+    GO.ORA.temp.down<-GOseq.Atgoslim.BP.list.ORA(gsub("\\.[[:digit:]]+", "", as_vector(genelist.down[,"gene_id"])),custom.category.list=Atgoslim.TAIR.BP.list, expressed.genes = expressed.genes)
+    # handling "no enriched GO" 
+    # genelist.names<-c("GO.ORA.temp.up_down","GO.ORA.temp.down_up") # test
+    x<-list(GO.ORA.temp.up=GO.ORA.temp.up,
+            GO.ORA.temp.down=GO.ORA.temp.down) # list
+    print(x[x=="no enriched GO"])
+    x<-x[!x=="no enriched GO"] # reove "no enriched GO" result
+    if (length(x)!=0) {
+    ## add sample info and FC info and save GO.ORA result
+  for (i in 1:length(x)) {
+      GO.ORA.result<-x[[i]] %>% mutate(FC = gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),sample=DEG.objs2[n])
+    save(GO.ORA.result,file=file.path("..","output",paste(gsub(".csv","",DEG.objs2[n]),gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),"single.coef.enrich.Rdata",sep=".")))
+    rm(GO.ORA.result)
+  }
+    }
+}
+```
+
+
+
+```{r}
+eGOseqs<-list.files(pattern="single.coef.enrich.Rdata",path=file.path("..", "output"))[c(1:6)]
+eGOseqs.list2<-sapply(file.path("..","output",eGOseqs),function(x) mget(load(x))) # mget will return the value of the object(or objects) in a list. see https://stackoverflow.com/questions/29398630/load-data-frames-into-list
+#names(eGOseqs.list2)
+eGOseqs.list2.summary<-do.call("rbind",eGOseqs.list2) 
+#head(eGOseqs.list2.summary) # make sure those are file names
+rownames(eGOseqs.list2.summary)<-1:nrow(eGOseqs.list2.summary)
+```
+
+```{r}
+library(scales)
+```
+#plot
+```{r}
+# eGOseqs.list2.summary (more than three genes in each KO)
+eGOseqs.list2.summary<-eGOseqs.list2.summary[eGOseqs.list2.summary$numDEInCat>3,]
+# focused on only very significant GO terms
+eGOseqs.list2.summary<-eGOseqs.list2.summary[eGOseqs.list2.summary$over_represented_padjust<0.05,]
+# how to cluster GO Ontology according to this pattern?
+## using hclust to sort GO terms
+GO.list<-unique(eGOseqs.list2.summary$category)
+sample.list<-unique(eGOseqs.list2.summary$sample_FC) # revised
+# having x-label also used the x-label for df below
+eGOseqs.list2.summary <- eGOseqs.list2.summary %>% mutate(sample=gsub(".csv", "", sample)) %>% mutate(sample=gsub(".DEGs.int", "", sample)) %>% unite(sample_FC,sample,FC)
+
+# Making matrix for calculate hierarchical clustering of "over-representd_padjust" value using sperad
+df<-eGOseqs.list2.summary %>% dplyr::select(category,sample_FC,over_represented_padjust) %>% spread(sample_FC,over_represented_padjust,-1)
+
+df[df<1e-100]<-1e-100 # to avoid "Inf" after log10 transformation
+df<- df %>% mutate_at(vars(2:6) ,.funs=function(x) -log10(x))
+# df<- df %>% mutate_at(vars(2:11) ,.funs=-log10) # does not work
+df[is.na(df)]<-1
+df2<-df[,2:6]
+rownames(df2)<-df$category
+hc<-stats::hclust(dist(df2), "ave") # only numbers
+hc$order
+```
+#plot
+```{r}
+hc.tib<-tibble(category=hc$labels,order=hc$order)
+# change term order using hclust() results
+hc.tib2<-hc.tib %>% inner_join(eGOseqs.list2.summary[,c("category","term")],by="category") %>% distinct() %>% arrange(desc(order))
+eGOseqs.list2.summary$term<-factor(eGOseqs.list2.summary$term,levels=as_vector(hc.tib2$term))
+# To avoid gray color, add 1e-20 to smaller padjust value
+eGOseqs.list2.summary$over_represented_padjust[eGOseqs.list2.summary$over_represented_padjust<1e-50]<-1e-50
+# format x label
+#eGOseqs.list2.summary <- eGOseqs.list2.summary  %>% mutate(sample2=str_replace(sample,"trt.density","trt_density")) %>%  separate(sample2,into=c("tissue","factor","DEGs","model","ref_density","ref_soil"),sep="\\.") %>% mutate(ref_soil=str_remove(ref_soil,"r")) %>% mutate(ref_density=str_remove(ref_density,"r"))  %>% unite(density_FC,ref_density,FC) # simplify elements in "density_FC" column for simpler x label in heatmap
+# plot
+eGOseqs.list2.summary <- separate(eGOseqs.list2.summary, "sample_FC", into = c("sample", "FC"), sep = "_")
+
+eGOseqs.list2.summary$sample <- gsub("DEgenes\\.", "", eGOseqs.list2.summary$sample)
+
+eGOseqs.list2.summary <- separate(eGOseqs.list2.summary, "sample", into = c("genotype", "time_point", "ref"))
+  GOseq.plot<-ggplot(eGOseqs.list2.summary,aes(x=time_point,y=term)) + facet_wrap(genotype~FC, ncol = 4)+ geom_tile(aes(fill=-log10(over_represented_padjust)),colour="black")  + scale_fill_gradient2(limit=c(0,50),low=muted("green"), high=muted("magenta")) # OK
+GOseq.plot<-GOseq.plot+     theme(axis.text.x=element_text(size=10,angle=90),
+          axis.text.y=element_text(size=10),
+          axis.title=element_text(size=10),
+          axis.ticks = element_blank(),
+          panel.background = element_rect(fill = "white",colour="black"),
+          plot.title=element_text(size=20),
+          axis.line=element_blank()) + labs(x="",y="",title="",fill="-log10\n pvalue")
+GOseq.plot
+
+ggsave(filename = "GO.enrich.heatmap.single.coef.myc102218.pdf", plot = GOseq.plot, path = "../output", height = 10, width = 10,units = "in")
+```
+
+#Figure 3 heatmap for enriche hormone responsive category analysis
+#
