@@ -1,0 +1,187 @@
+---
+title: "MYC234_PIFtargets"
+author: "Kazu"
+date: "5/22/2019"
+output: 
+  html_document: 
+    keep_md: yes
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,error=TRUE)
+```
+###package needed
+```{r}
+library(tidyverse)
+library(ggdendro)
+library(plotly)
+library(edgeR)
+library(readxl)
+library(goseq) # goseq
+```
+# read custom category list
+```{r}
+#load("../input/At.hormone.responsive.list.Rdata")
+# load custom categories
+load(file.path("..","input","hormone.responsiveness6.DF.s.Rdata")) # using SAup_combined & SAdown_combined
+#hormone.responsiveness6.DF.s %>% dplyr::select(PIFtarget)
+#At.hormone.responsive.list<-read_xlsx(path=file.path("..","input","Supplemental_Dataset3_source_of_custom_categories.xlsx"),sheet=1,skip=15)
+#At.hormone.responsive.list %>% dplyr::select(PIFtarget)
+# from tpc120857_SupplementalTable1.pdf (Leivar and Monte, 2014)
+PIFup<-c("AT5G39860","AT5G15160","AT4G16780","AT2G44910","AT5G47370","AT3G60390","AT1G18400","AT1G69010","AT1G03790","AT1G02340","AT1G14920","AT2G42870","AT2G46970","AT3G62090","AT2G43060","AT5G02200","AT2G37678","AT1G52830","AT1G04250","AT1G09570","AT4G28720","AT1G04180","AT1G70560","AT4G39950","AT4G27260","AT1G70940","AT3G14370","AT5G18010","AT4G37770","AT5G65800","AT1G02400","AT5G07010","AT5G07000","AT1G75450","AT4G10240","AT4G32280","AT3G15540","AT5G04190","AT4G25470")
+PIFdown<-c("AT1G06040","AT5G44190","AT4G26150","AT5G56860","AT5G13630","AT1G70700","AT1G05010","AT5G67030","AT1G01060","AT2G46830")
+PIFcomplex<-c("AT5G11260","AT5G02760")
+At.PIFtarget.list<-list(PIFup=PIFup,PIFdown=PIFdown,PIFcomplex=PIFcomplex)
+```
+# convert into custom category list
+# format At.PIFtarget.list2 into goseq() compatible list (run once)
+```{r eval=FALSE}
+# extract AGI from At_cdna
+At.gene.name<-tibble(name=names(At_cdna)) %>% separate(name,into=c("name2","Symbol","description"),sep=" \\|",extra="drop",fill="left") %>%  mutate(AGI=str_remove(name2,pattern="\\.[[:digit:]]+")) 
+# make presence/absense hormone responsive gene table (dataframe)
+  for(i in 1:3) {
+  genes<-At.PIFtarget.list[[i]] %>% as_vector()
+  temp<-data.frame(AGI=genes,category=names(At.PIFtarget.list)[i])
+  #At.gene.name %>% left_join(temp,by=c("name"="AGI")) -> At.gene.name
+At.gene.name %>% left_join(temp,by="AGI") -> At.gene.name 
+  }
+names(At.gene.name)[5:7] <- names(At.PIFtarget.list)
+At.gene.name %>% filter(str_detect(AGI,pattern="AT1G|AT2G|AT3G|AT4G|AT5G|ATC|ATM")) %>% unite(category,5:7,sep=",")->test2
+test2[1:10,] %>%  mutate(category=gsub("NA","",category)) %>% mutate(category=gsub(",","",category))
+# only select genes with AGI name and concatenate categories
+At.gene.name %>% filter(str_detect(AGI,pattern="AT1G|AT2G|AT3G|AT4G|AT5G|ATC|ATM")) %>% unite(category,5:7,sep=",") %>%  mutate(category=gsub("NA,","",category)) %>% mutate(category=gsub(",NA","",category)) %>% mutate(category=gsub("NA","",category)) ->test3
+# convert into list object
+temp.list<-list()
+for(i in 1:dim(test3)[1]) {
+  temp.list[[i]]<-test3 %>% slice(i) %>% pull(category)
+}
+names(temp.list)<-test3 %>% pull(AGI)
+# split concatanated categories in each gene
+At.PIFtarget.list2<-lapply(temp.list,function(x) unlist(strsplit(x, split=",")))
+# save
+save(At.PIFtarget.list2,file="..","output","At.PIFtarget.list2.Rdata")
+
+```
+
+
+# prep for GOseq with custom category
+```{r}
+ # bias.data vector must have the same length as DEgenes vector! 
+getwd()
+At_cdna<-Biostrings::readDNAStringSet("https://www.arabidopsis.org/download_files/Sequences/TAIR10_blastsets/TAIR10_cdna_20110103_representative_gene_model_updated")
+At_cdna
+
+## if you want to test expressed genes as background, add background in this function
+load(file.path("..","output","At.PIFtarget.list2.Rdata"))
+GOseq.At.customcat.ORA<-function(genelist,padjust=0.05,custom.category.list=At.hormone.responsive.list,cdna=At_cdna,background="") { # return GO enrichment table, padjus, padjust=0.05. New BLAST2GO results with only BP Brgo.v2.5.BP.list is used (042518). Brgo.v2.5.BP.list is based on Hajar's Blast2go, which should be replaced with Brgo.Atgoslim.BP.list and giving a new name to this function (080818). cdna is DNAstring object. background is a vector of genes.
+  #bias<-nchar(cdna)
+  bias<-Biostrings::width(cdna)
+  # add name to "bias". cdna
+  #names(bias)<-names(cdna)
+ names(bias) <- tibble(name=names(cdna)) %>% separate(name,into=c("name2","Symbol","description"),sep=" \\|",extra="drop",fill="left") %>%  mutate(AGI=gsub(pattern="\\.[[:digit:]]+", "", name2)) %>% pull(AGI)
+ if(background=="") {print("Use all genes in genome as background")} else {
+ # select only expressed geens 
+  bias <- bias[background$gene_id]
+  print("Expessed genes are used as background.")
+  print(paste("length of bias is ",length(bias)))
+ }
+  TF<-(names(bias) %in% genelist)*1
+  names(TF)<-names(bias)
+  #print(TF)
+  pwf<-nullp(TF,bias.data=bias)
+  #print(pwf$DEgenes)
+  GO.pval <- goseq(pwf,gene2cat=custom.category.list,use_genes_without_cat=TRUE) # format became different in new goseq version (021111). Does not work (042716)
+  # calculate p ajust by BH
+  GO.pval$over_represented_padjust<-p.adjust(GO.pval$over_represented_pvalue,method="BH")
+  if(GO.pval$over_represented_padjust[1]>padjust) return("no enriched GO")
+  else {
+    enriched.GO<-GO.pval[GO.pval$over_represented_padjust<padjust,] 
+    print("enriched.GO is")
+    print(enriched.GO)
+    return(enriched.GO)
+  }
+}
+```
+
+# Importing enrichment result table and have summary table: Table of DEGs (under construction)
+```{r message=FALSE, error=TRUE}
+# Ding (2018) Cell DEGs
+list.files(path=file.path("..","output","DEGs_with_description"),pattern=".csv") # finding files in different blogs did not work.. Did work this time... why?
+getwd()
+DEG.objs<-list.files(path=file.path("..","output","DEGs_with_description"),pattern="\\.csv$") # under construction
+DEG.objs
+# read csv file
+DEG.list<-lapply(DEG.objs, function(x) read_csv(paste(file.path("..","output","DEGs_with_description"),"/",x,sep="")))
+names(DEG.list)<-gsub(".csv","",DEG.objs)
+DEG.list
+# GOseq.Atgoslim.BP.list.ORA(genelist=genes.shade1h.up$AGI)
+```
+
+# overlap table
+```{r}
+# expressed genes... what is the best way?
+#expressed.genes<- s
+#  Col.49h %>% dplyr::select(gene_id) # only 151 genes?
+#  gsub("(.)(\\.[[:digit:]]+)","\\1",as_vector(dge.nolow$genes)) # needs to be modified
+
+# testingGOseq.At.customcat 
+GOseq.At.customcat.ORA(genelist=At.PIFtarget.list[[1]],custom.category.list=At.PIFtarget.list2)
+
+```
+# GO.ORA for each DEG list (loop)
+```{r message=FALSE, error=TRUE}
+names(DEG.list)
+for(n in 1:14) {
+  genelist.all<-DEG.list[[n]]
+# DEG.list[[n]]  %>%  dplyr::filter((as.name(names(DEG.list[[n]])[2]))>0)  # does not work
+genelist.upup<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[2])))>0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))>0)
+    genelist.updown<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[2])))>0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))<0)
+        genelist.downup<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[2])))<0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))>0)
+    genelist.downdown<-  DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[2])))<0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))<0)
+GO.ORA.temp.all<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.all[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
+    GO.ORA.temp.up_up<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.upup[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
+    GO.ORA.temp.up_down<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.updown[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
+    GO.ORA.temp.down_up<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.downup[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
+    GO.ORA.temp.down_down<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.downdown[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
+    # handling "no enriched GO" 
+    # genelist.names<-c("GO.ORA.temp.up_down","GO.ORA.temp.down_up") # test
+    x<-list(GO.ORA.temp.all=GO.ORA.temp.all,
+      GO.ORA.temp.up_up=GO.ORA.temp.up_up,
+            GO.ORA.temp.up_down=GO.ORA.temp.up_down,
+            GO.ORA.temp.down_up=GO.ORA.temp.down_up,
+            GO.ORA.temp.down_down=GO.ORA.temp.down_down) # list
+    print(x[x=="no enriched GO"])
+    x<-x[!x=="no enriched GO"] # reove "no enriched GO" result
+    ## add sample info and FC info and save GO.ORA result
+    ## avoid error with x is empty
+    if(length(x)==0) {next} else {
+  for (i in 1:length(x)) {
+      GO.ORA.result<-x[[i]] %>% mutate(FC = gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),sample=DEG.objs[n])
+    save(GO.ORA.result,file=file.path("..","output",paste(gsub(".csv","",DEG.objs[n]),gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),"enrich.Rdata",sep=".")))
+    rm(GO.ORA.result)
+  }
+    } 
+}
+
+```
+
+# read GOseq result table
+```{r messages=FALSE}
+eGOseqs<-list.files(pattern="enrich.Rdata",path=file.path("..","output"))
+eGOseqs.list2<-sapply(file.path("..","output",eGOseqs),function(x) mget(load(x))) # mget will return the value of the object(or objects) in a list. see https://stackoverflow.com/questions/29398630/load-data-frames-into-list
+#names(eGOseqs.list2)
+eGOseqs.list2.summary<-do.call("rbind",eGOseqs.list2) 
+#head(eGOseqs.list2.summary) # make sure those are file names
+rownames(eGOseqs.list2.summary)<-1:nrow(eGOseqs.list2.summary)
+View(eGOseqs.list2.summary)
+# write in csv file
+write_csv(eGOseqs.list2.summary,path=file.path("..","output","PIFtarget.eGOseqs.list2.summary.csv"))
+```
+
+
+# Session info
+```{r}
+sessionInfo()
+```
