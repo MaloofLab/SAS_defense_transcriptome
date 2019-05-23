@@ -180,6 +180,52 @@ View(eGOseqs.list2.summary)
 write_csv(eGOseqs.list2.summary,path=file.path("..","output","PIFtarget.eGOseqs.list2.summary.csv"))
 ```
 
+# plotting expression pattern
+```{r}
+###import dge.data and calculate cpm
+```{r}
+# fo Kazu
+ if(Sys.info()["user"]=="nozue") { 
+load(file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output/dge.Rdata"))
+ }
+# for Chunmei
+ if(Sys.info()["user"]=="LCM") { 
+load(file.path("C:","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output/dge.Rdata"))
+ }
+
+log2_cpm <- log2(cpm(dge.data)+1) # copied and pasted from "combined_scripts_for_figures.Rmd". Why log2(cpm(dge.data)+1)? not log2(cpm(dge.data))? (052319)
+head(log2_cpm)
+rownames(log2_cpm) <- gsub("\\.\\d", "", rownames(log2_cpm)) #remove ".digital" after each AGI number
+
+#subset to keep Col and myc234 data
+
+log2_cpm <- log2_cpm[, 1:32]
+head(log2_cpm)
+#
+cpm.wide <- bind_cols(tibble(gene_id=rownames(log2_cpm)),as_tibble(log2_cpm)) 
+cpm.wide
+```
+# plot ("up" in myc324 (logFC.gtmyc234>0))
+```{r}
+names(DEG.list)
+# npr1-1 misregulated genes 
+plot.data<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide,by="gene_id") %>% unite(AGI_desc,c("gene_id","name")) %>% dplyr::select(-LR,-PValue,-X1,-logCPM) 
+# plot: use labeller = label_wrap_gen(width=10) for multiple line in each gene name
+p.up<-plot.data %>% filter(logFC.gtmyc234>0 & FDR<1e-10) %>% dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description) %>%  gather(sample,value,-1) %>%
+  separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=fct_relevel(treatment,"H"),y=value,color=genotype,shape=rep)) + geom_jitter() + facet_wrap(AGI_desc~.,scale="free",ncol=5,labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="up (logFC.gtmyc234>0)")
+p.up
+```
+# plot ("down" in myc324 (logFC.gtmyc234>0))
+```{r}
+names(DEG.list)
+# npr1-1 misregulated genes 
+plot.data<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide,by="gene_id") %>% unite(AGI_desc,c("gene_id","name")) %>% dplyr::select(-LR,-PValue,-X1,-logCPM) 
+# plot: use labeller = label_wrap_gen(width=10) for multiple line in each gene name
+p.down<-plot.data %>% filter(logFC.gtmyc234<0 & FDR<1e-100) %>% dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description) %>%  gather(sample,value,-1) %>%
+  separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=fct_relevel(treatment,"H"),y=value,color=genotype,shape=rep)) + geom_jitter() + facet_wrap(AGI_desc~.,scale="free",ncol=5,labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="down (logFC.gtmyc234<0)")
+p.down
+```
+
 
 # Session info
 ```{r}
