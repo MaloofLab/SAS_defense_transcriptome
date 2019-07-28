@@ -17,7 +17,7 @@ library(tidyverse)
 ```
 
 ```
-## ── Attaching packages ───────────────────────────────────────────────────────────────── tidyverse 1.2.1 ──
+## ── Attaching packages ──────────────────────────────────────────────── tidyverse 1.2.1 ──
 ```
 
 ```
@@ -56,7 +56,7 @@ library(tidyverse)
 ```
 
 ```
-## ── Conflicts ──────────────────────────────────────────────────────────────────── tidyverse_conflicts() ──
+## ── Conflicts ─────────────────────────────────────────────────── tidyverse_conflicts() ──
 ## ✖ dplyr::filter() masks stats::filter()
 ## ✖ dplyr::lag()    masks stats::lag()
 ```
@@ -136,36 +136,6 @@ PIFcomplex<-c("AT5G11260","AT5G02760")
 At.PIFtarget.list<-list(PIFup=PIFup,PIFdown=PIFdown,PIFcomplex=PIFcomplex)
 ```
 # convert into custom category list
-# format At.PIFtarget.list2 into goseq() compatible list (run once)
-
-```r
-# extract AGI from At_cdna
-At.gene.name<-tibble(name=names(At_cdna)) %>% separate(name,into=c("name2","Symbol","description"),sep=" \\|",extra="drop",fill="left") %>%  mutate(AGI=str_remove(name2,pattern="\\.[[:digit:]]+")) 
-# make presence/absense hormone responsive gene table (dataframe)
-  for(i in 1:3) {
-  genes<-At.PIFtarget.list[[i]] %>% as_vector()
-  temp<-data.frame(AGI=genes,category=names(At.PIFtarget.list)[i])
-  #At.gene.name %>% left_join(temp,by=c("name"="AGI")) -> At.gene.name
-At.gene.name %>% left_join(temp,by="AGI") -> At.gene.name 
-  }
-names(At.gene.name)[5:7] <- names(At.PIFtarget.list)
-At.gene.name %>% filter(str_detect(AGI,pattern="AT1G|AT2G|AT3G|AT4G|AT5G|ATC|ATM")) %>% unite(category,5:7,sep=",")->test2
-test2[1:10,] %>%  mutate(category=gsub("NA","",category)) %>% mutate(category=gsub(",","",category))
-# only select genes with AGI name and concatenate categories
-At.gene.name %>% filter(str_detect(AGI,pattern="AT1G|AT2G|AT3G|AT4G|AT5G|ATC|ATM")) %>% unite(category,5:7,sep=",") %>%  mutate(category=gsub("NA,","",category)) %>% mutate(category=gsub(",NA","",category)) %>% mutate(category=gsub("NA","",category)) ->test3
-# convert into list object
-temp.list<-list()
-for(i in 1:dim(test3)[1]) {
-  temp.list[[i]]<-test3 %>% slice(i) %>% pull(category)
-}
-names(temp.list)<-test3 %>% pull(AGI)
-# split concatanated categories in each gene
-At.PIFtarget.list2<-lapply(temp.list,function(x) unlist(strsplit(x, split=",")))
-# save
-save(At.PIFtarget.list2,file="..","output","At.PIFtarget.list2.Rdata")
-```
-
-
 # prep for GOseq with custom category
 
 ```r
@@ -197,23 +167,46 @@ At_cdna
 ## [33601]   366 ATGGCATCAAAAATCCGCA...CCTTCTGCATACGCATAA ATMG00130.1 | Sym...
 ## [33602]    74 GCGCTCTTAGTTCAGTTCG...CAAATCCTACAGAGCGTG ATMG00930.1 | Sym...
 ```
+# format At.PIFtarget.list2 into goseq() compatible list (run once)
 
 ```r
+# extract AGI from At_cdna
+At.gene.name<-tibble(name=names(At_cdna)) %>% separate(name,into=c("name2","Symbol","description"),sep=" \\|",extra="drop",fill="left") %>%  mutate(AGI=str_remove(name2,pattern="\\.[[:digit:]]+")) 
+# make presence/absense hormone responsive gene table (dataframe)
+  for(i in 1:3) {
+  genes<-At.PIFtarget.list[[i]] %>% as_vector()
+  temp<-data.frame(AGI=genes,category=names(At.PIFtarget.list)[i])
+  #At.gene.name %>% left_join(temp,by=c("name"="AGI")) -> At.gene.name
+At.gene.name %>% left_join(temp,by="AGI") -> At.gene.name 
+  }
+names(At.gene.name)[5:7] <- names(At.PIFtarget.list)
+At.gene.name %>% filter(str_detect(AGI,pattern="AT1G|AT2G|AT3G|AT4G|AT5G|ATC|ATM")) %>% unite(category,5:7,sep=",")->test2
+test2[1:10,] %>%  mutate(category=gsub("NA","",category)) %>% mutate(category=gsub(",","",category))
+# only select genes with AGI name and concatenate categories
+At.gene.name %>% filter(str_detect(AGI,pattern="AT1G|AT2G|AT3G|AT4G|AT5G|ATC|ATM")) %>% unite(category,5:7,sep=",") %>%  mutate(category=gsub("NA,","",category)) %>% mutate(category=gsub(",NA","",category)) %>% mutate(category=gsub("NA","",category)) ->test3
+# convert into list object
+temp.list<-list()
+for(i in 1:dim(test3)[1]) {
+  temp.list[[i]]<-test3 %>% slice(i) %>% pull(category)
+}
+names(temp.list)<-test3 %>% pull(AGI)
+# split concatanated categories in each gene
+At.PIFtarget.list2<-lapply(temp.list,function(x) unlist(strsplit(x, split=",")))
+# save
+save(At.PIFtarget.list2,file=file.path("..","output","At.PIFtarget.list2.Rdata"))
+```
+
+
+# prep for GOseq with custom category
+
+```r
+#  # bias.data vector must have the same length as DEgenes vector! 
+# getwd()
+# At_cdna<-Biostrings::readDNAStringSet("https://www.arabidopsis.org/download_files/Sequences/TAIR10_blastsets/TAIR10_cdna_20110103_representative_gene_model_updated")
+# At_cdna
+
 ## if you want to test expressed genes as background, add background in this function
 load(file.path("..","output","At.PIFtarget.list2.Rdata"))
-```
-
-```
-## Warning in readChar(con, 5L, useBytes = TRUE): cannot open compressed file
-## '../output/At.PIFtarget.list2.Rdata', probable reason 'No such file or
-## directory'
-```
-
-```
-## Error in readChar(con, 5L, useBytes = TRUE): cannot open the connection
-```
-
-```r
 GOseq.At.customcat.ORA<-function(genelist,padjust=0.05,custom.category.list=At.hormone.responsive.list,cdna=At_cdna,background="") { # return GO enrichment table, padjus, padjust=0.05. New BLAST2GO results with only BP Brgo.v2.5.BP.list is used (042518). Brgo.v2.5.BP.list is based on Hajar's Blast2go, which should be replaced with Brgo.Atgoslim.BP.list and giving a new name to this function (080818). cdna is DNAstring object. background is a vector of genes.
   #bias<-nchar(cdna)
   bias<-Biostrings::width(cdna)
@@ -581,10 +574,29 @@ GOseq.At.customcat.ORA(genelist=At.PIFtarget.list[[1]],custom.category.list=At.P
 ```
 
 ```
-## Error in goseq(pwf, gene2cat = custom.category.list, use_genes_without_cat = TRUE): object 'At.PIFtarget.list2' not found
+## Using manually entered categories.
 ```
 
-![](MYC234_PIF4target_files/figure-html/unnamed-chunk-6-1.png)<!-- -->
+```
+## Calculating the p-values...
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-7-1.png)<!-- -->
+
+```
+## [1] "enriched.GO is"
+##   category over_represented_pvalue under_represented_pvalue numDEInCat
+## 3    PIFup                       0                        1         39
+##   numInCat over_represented_padjust
+## 3       39                        0
+```
+
+```
+##   category over_represented_pvalue under_represented_pvalue numDEInCat
+## 3    PIFup                       0                        1         39
+##   numInCat over_represented_padjust
+## 3       39                        0
+```
 # GO.ORA for each DEG list (loop)
 
 ```r
@@ -602,6 +614,17 @@ names(DEG.list)
 ```
 
 ```r
+# make special output directory
+dir.create(path=file.path("..","output","doubleCoef"))
+```
+
+```
+## Warning in dir.create(path = file.path("..", "output", "doubleCoef")): '../
+## output/doubleCoef' already exists
+```
+
+```r
+#
 for(n in 1:14) {
   genelist.all<-DEG.list[[n]]
 # DEG.list[[n]]  %>%  dplyr::filter((as.name(names(DEG.list[[n]])[2]))>0)  # does not work
@@ -609,11 +632,22 @@ genelist.upup<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[
     genelist.updown<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[2])))>0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))<0)
         genelist.downup<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[2])))<0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))>0)
     genelist.downdown<-  DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[2])))<0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))<0)
-GO.ORA.temp.all<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.all[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
-    GO.ORA.temp.up_up<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.upup[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
-    GO.ORA.temp.up_down<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.updown[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
-    GO.ORA.temp.down_up<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.downup[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
-    GO.ORA.temp.down_down<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.downdown[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
+#    if(as_vector(genelist.all[,"gene_id"]) ***) { # under construciton. Do not use this form this time.
+# if genelist.all[,"gene_id"] has "AT***.1" pattern (with splicing variants)
+#GO.ORA.temp.all<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.all[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
+#    GO.ORA.temp.up_up<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.upup[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
+#    GO.ORA.temp.up_down<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.updown[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
+#    GO.ORA.temp.down_up<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.downup[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
+#    GO.ORA.temp.down_down<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.downdown[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
+#    } else {
+# if genelist.all[,"gene_id"] has no spricing variant version (only AGI name)
+    GO.ORA.temp.all<-GOseq.At.customcat.ORA(as_vector(genelist.all[,"gene_id"]),custom.category.list=At.PIFtarget.list2)
+    GO.ORA.temp.up_up<-GOseq.At.customcat.ORA(as_vector(genelist.upup[,"gene_id"]),custom.category.list=At.PIFtarget.list2)
+    GO.ORA.temp.up_down<-GOseq.At.customcat.ORA(as_vector(genelist.updown[,"gene_id"]),custom.category.list=At.PIFtarget.list2)
+    GO.ORA.temp.down_up<-GOseq.At.customcat.ORA(as_vector(genelist.downup[,"gene_id"]),custom.category.list=At.PIFtarget.list2)
+    GO.ORA.temp.down_down<-GOseq.At.customcat.ORA(as_vector(genelist.downdown[,"gene_id"]),custom.category.list=At.PIFtarget.list2)
+ #   }
+    
     # handling "no enriched GO" 
     # genelist.names<-c("GO.ORA.temp.up_down","GO.ORA.temp.down_up") # test
     x<-list(GO.ORA.temp.all=GO.ORA.temp.all,
@@ -623,12 +657,12 @@ GO.ORA.temp.all<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.all[,"gene
             GO.ORA.temp.down_down=GO.ORA.temp.down_down) # list
     print(x[x=="no enriched GO"])
     x<-x[!x=="no enriched GO"] # reove "no enriched GO" result
-    ## add sample info and FC info and save GO.ORA result
+    ## add sample info and FC info and save GO.ORA result (this is not working well; 072819)
     ## avoid error with x is empty
     if(length(x)==0) {next} else {
   for (i in 1:length(x)) {
       GO.ORA.result<-x[[i]] %>% mutate(FC = gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),sample=DEG.objs[n])
-    save(GO.ORA.result,file=file.path("..","output",paste(gsub(".csv","",DEG.objs[n]),gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),"enrich.Rdata",sep=".")))
+    save(GO.ORA.result,file=file.path("..","output","doubleCoef",paste(gsub(".csv","",DEG.objs[n]),gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),"enrich.Rdata",sep=".")))
     rm(GO.ORA.result)
   }
     } 
@@ -644,251 +678,1005 @@ GO.ORA.temp.all<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.all[,"gene
 ```
 
 ```
-## Error in GOseq.At.customcat.ORA(str_remove(as_vector(genelist.all[, "gene_id"]), : object 'At.PIFtarget.list2' not found
+## [1] "enriched.GO is"
+##   category over_represented_pvalue under_represented_pvalue numDEInCat
+## 3    PIFup             1.22375e-06                        1          5
+##   numInCat over_represented_padjust
+## 3       39             3.671249e-06
+## [1] "Use all genes in genome as background"
 ```
 
-![](MYC234_PIF4target_files/figure-html/unnamed-chunk-7-1.png)<!-- -->
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-1.png)<!-- -->
+
+```
+## [1] "enriched.GO is"
+##   category over_represented_pvalue under_represented_pvalue numDEInCat
+## 3    PIFup            5.209622e-09                        1          5
+##   numInCat over_represented_padjust
+## 3       39             1.562887e-08
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-2.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-3.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+```
+## $GO.ORA.temp.up_down
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_down
+## [1] "no enriched GO"
+## 
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-4.png)<!-- -->
+
+```
+## [1] "enriched.GO is"
+##     category over_represented_pvalue under_represented_pvalue numDEInCat
+## 1 PIFcomplex              0.01227929                0.9999623          1
+##   numInCat over_represented_padjust
+## 1        2               0.03683786
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-5.png)<!-- -->
+
+```
+## [1] "enriched.GO is"
+##     category over_represented_pvalue under_represented_pvalue numDEInCat
+## 1 PIFcomplex             0.003782456                0.9999965          1
+##   numInCat over_represented_padjust
+## 1        2               0.01134737
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-6.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-7.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+```
+## $GO.ORA.temp.up_down
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_down
+## [1] "no enriched GO"
+## 
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-8.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-9.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-10.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-11.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+```
+## $GO.ORA.temp.all
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.up_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.up_down
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_down
+## [1] "no enriched GO"
+## 
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-12.png)<!-- -->![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-13.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-14.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-15.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+```
+## $GO.ORA.temp.all
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.up_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.up_down
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_down
+## [1] "no enriched GO"
+## 
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-16.png)<!-- -->
+
+```
+## [1] "enriched.GO is"
+##   category over_represented_pvalue under_represented_pvalue numDEInCat
+## 3    PIFup            0.0007763874                0.9998955          6
+## 2  PIFdown            0.0031048381                0.9998282          3
+##   numInCat over_represented_padjust
+## 3       39              0.002329162
+## 2       10              0.004657257
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-17.png)<!-- -->
+
+```
+## [1] "enriched.GO is"
+##     category over_represented_pvalue under_represented_pvalue numDEInCat
+## 2    PIFdown             0.006068713                0.9998067          2
+## 1 PIFcomplex             0.015796101                0.9999373          1
+##   numInCat over_represented_padjust
+## 2       10               0.01820614
+## 1        2               0.02369415
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-18.png)<!-- -->
+
+```
+## [1] "enriched.GO is"
+##   category over_represented_pvalue under_represented_pvalue numDEInCat
+## 3    PIFup            0.0006628999                0.9999325          5
+##   numInCat over_represented_padjust
+## 3       39                0.0019887
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-19.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+```
+## $GO.ORA.temp.down_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_down
+## [1] "no enriched GO"
+## 
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-20.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-21.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-22.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-23.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+```
+## $GO.ORA.temp.all
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.up_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.up_down
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_down
+## [1] "no enriched GO"
+## 
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-24.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-25.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-26.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-27.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+```
+## $GO.ORA.temp.all
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.up_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.up_down
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_down
+## [1] "no enriched GO"
+## 
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-28.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-29.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-30.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-31.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+```
+## $GO.ORA.temp.all
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.up_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.up_down
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_down
+## [1] "no enriched GO"
+## 
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-32.png)<!-- -->
+
+```
+## [1] "enriched.GO is"
+##   category over_represented_pvalue under_represented_pvalue numDEInCat
+## 2  PIFdown              0.01395899                0.9981697          4
+##   numInCat over_represented_padjust
+## 2       10               0.04187696
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-33.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-34.png)<!-- -->
+
+```
+## [1] "enriched.GO is"
+##   category over_represented_pvalue under_represented_pvalue numDEInCat
+## 2  PIFdown               0.0140555                0.9986469          3
+##   numInCat over_represented_padjust
+## 2       10               0.04216649
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-35.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+```
+## $GO.ORA.temp.up_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_down
+## [1] "no enriched GO"
+## 
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-36.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-37.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-38.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-39.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+```
+## $GO.ORA.temp.all
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.up_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.up_down
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_down
+## [1] "no enriched GO"
+## 
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-40.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-41.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-42.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-43.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+```
+## $GO.ORA.temp.all
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.up_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.up_down
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_down
+## [1] "no enriched GO"
+## 
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-44.png)<!-- -->
+
+```
+## [1] "enriched.GO is"
+##   category over_represented_pvalue under_represented_pvalue numDEInCat
+## 3    PIFup             0.001157632                0.9999826          2
+##   numInCat over_represented_padjust
+## 3       39              0.003472897
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-45.png)<!-- -->![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-46.png)<!-- -->
+
+```
+## [1] "enriched.GO is"
+##   category over_represented_pvalue under_represented_pvalue numDEInCat
+## 3    PIFup            0.0002804182                 0.999998          2
+##   numInCat over_represented_padjust
+## 3       39             0.0008412547
+## [1] "Use all genes in genome as background"
+```
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-47.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+```
+## $GO.ORA.temp.up_down
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_down
+## [1] "no enriched GO"
+## 
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-48.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-49.png)<!-- -->![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-50.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-51.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-52.png)<!-- -->
+
+```
+## $GO.ORA.temp.all
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.up_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.up_down
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_down
+## [1] "no enriched GO"
+## 
+## [1] "Use all genes in genome as background"
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-53.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in pcls(G): initial point very close to some inequality constraints
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-54.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-55.png)<!-- -->
+
+```
+## [1] "Use all genes in genome as background"
+```
+
+```
+## Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L =
+## G$L, : Fitting terminated with step failure - check results carefully
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-8-56.png)<!-- -->
+
+```
+## $GO.ORA.temp.all
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.up_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.up_down
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_up
+## [1] "no enriched GO"
+## 
+## $GO.ORA.temp.down_down
+## [1] "no enriched GO"
+```
 
 # read GOseq result table
 
 ```r
-eGOseqs<-list.files(pattern="enrich.Rdata",path=file.path("..","output"))
-eGOseqs.list2<-sapply(file.path("..","output",eGOseqs),function(x) mget(load(x))) # mget will return the value of the object(or objects) in a list. see https://stackoverflow.com/questions/29398630/load-data-frames-into-list
+eGOseqs<-list.files(pattern="enrich.Rdata",path=file.path("..","output","doubleCoef"))
+eGOseqs.list2<-sapply(file.path("..","output","doubleCoef",eGOseqs),function(x) mget(load(x))) # mget will return the value of the object(or objects) in a list. see https://stackoverflow.com/questions/29398630/load-data-frames-into-list
 #names(eGOseqs.list2)
 eGOseqs.list2.summary<-do.call("rbind",eGOseqs.list2) 
 #head(eGOseqs.list2.summary) # make sure those are file names
 rownames(eGOseqs.list2.summary)<-1:nrow(eGOseqs.list2.summary)
 View(eGOseqs.list2.summary)
 # write in csv file
-write_csv(eGOseqs.list2.summary,path=file.path("..","output","PIFtarget.eGOseqs.list2.summary.csv"))
+write_csv(eGOseqs.list2.summary,path=file.path("..","output","doubleCoef","PIFtarget.eGOseqs.list2.summary.csv"))
 ```
 
 # plotting expression pattern
 
 ```r
 ###import dge.data and calculate cpm
-```
-
-```r
 # fo Kazu
  if(Sys.info()["user"]=="nozue") { 
 load(file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output/dge.Rdata"))
  }
+```
+
+```
+## Warning in readChar(con, 5L, useBytes = TRUE): cannot open compressed file
+## '/Users/nozue/Box/Chunmei_Myc_Paper/manuscripts/output/dge.Rdata', probable
+## reason 'No such file or directory'
+```
+
+```
+## Error in readChar(con, 5L, useBytes = TRUE): cannot open the connection
+```
+
+```r
 # for Chunmei
  if(Sys.info()["user"]=="LCM") { 
 load(file.path("C:","Users","LCM","Box","Chunmei_Myc_Paper","manuscripts","output/dge.Rdata"))
  }
 
 log2_cpm <- log2(cpm(dge.data)+1) # copied and pasted from "combined_scripts_for_figures.Rmd". Why log2(cpm(dge.data)+1)? not log2(cpm(dge.data))? (052319)
+```
+
+```
+## Error in cpm(dge.data): object 'dge.data' not found
+```
+
+```r
 head(log2_cpm)
 ```
 
 ```
-##             Col_1h_H_R1 Col_1h_H_R2 Col_1h_H_R3 Col_1h_H_R4 Col_1h_L_R1
-## AT1G01010.1    1.882378    1.549328    1.859647   0.3495007    1.635285
-## AT1G01020.1    3.949067    3.683874    3.953207   3.4436335    4.073895
-## AT1G01030.1    3.696947    3.210662    2.962007   2.6341919    3.902603
-## AT1G01040.2    5.843563    5.850580    6.221438   6.1970707    5.794556
-## AT1G01050.1    2.905938    2.896108    2.541064   3.3954475    3.352743
-## AT1G01060.1    1.677548    1.798066    1.944668   1.9036687    2.307554
-##             Col_1h_L_R2 Col_1h_L_R3 Col_1h_L_R4 Col_49h_H_R1 Col_49h_H_R2
-## AT1G01010.1    1.801100    2.100094    1.656959     1.413971     1.945634
-## AT1G01020.1    3.578056    3.072618    3.808893     3.766275     2.865233
-## AT1G01030.1    3.162137    2.617421    3.224172     2.583540     2.971768
-## AT1G01040.2    5.507127    5.925741    5.981456     6.098855     6.306458
-## AT1G01050.1    2.946565    2.710932    3.369243     2.525135     3.494090
-## AT1G01060.1    2.577782    2.294226    1.884485     1.946339     2.476123
-##             Col_49h_H_R3 Col_49h_H_R4 Col_49h_L_R1 Col_49h_L_R2
-## AT1G01010.1     1.649226     1.766327     0.923243     2.123812
-## AT1G01020.1     3.022739     3.619991     3.535360     2.948178
-## AT1G01030.1     1.852584     2.275897     2.752061     1.518938
-## AT1G01040.2     6.183816     6.171833     6.026365     6.075158
-## AT1G01050.1     3.650059     3.561742     3.779102     3.315543
-## AT1G01060.1     2.399045     2.412533     2.357204     1.519145
-##             Col_49h_L_R3 Col_49h_L_R4 myc234_1h_H_R1 myc234_1h_H_R2
-## AT1G01010.1     1.651207    0.8023493       1.797646       1.404666
-## AT1G01020.1     3.293433    3.4158655       3.507903       3.763755
-## AT1G01030.1     2.208194    2.1608279       3.285590       3.037048
-## AT1G01040.2     5.883716    5.9073507       6.066964       6.179175
-## AT1G01050.1     3.606511    3.7868386       2.846255       2.843656
-## AT1G01060.1     1.537809    2.8480933       2.670511       2.801847
-##             myc234_1h_H_R3 myc234_1h_H_R4 myc234_1h_L_R1 myc234_1h_L_R2
-## AT1G01010.1       1.814659       1.870886       1.800710       1.634296
-## AT1G01020.1       3.533415       3.067659       3.700881       3.706913
-## AT1G01030.1       2.986202       3.067319       3.746268       2.832237
-## AT1G01040.2       6.176655       5.984254       6.051525       6.007243
-## AT1G01050.1       3.294573       2.961914       3.417822       3.285188
-## AT1G01060.1       2.690827       2.848463       1.993103       2.433099
-##             myc234_1h_L_R3 myc234_1h_L_R4 myc234_49h_H_R1 myc234_49h_H_R2
-## AT1G01010.1       1.697148       1.432521        1.835804        2.212671
-## AT1G01020.1       3.854970       3.331111        3.036812        3.509414
-## AT1G01030.1       3.576841       3.014341        2.353753        2.157760
-## AT1G01040.2       5.995317       6.059650        6.452842        6.463489
-## AT1G01050.1       3.956161       3.838977        3.304964        3.301476
-## AT1G01060.1       3.145842       2.963156        2.941554        2.709542
-##             myc234_49h_H_R3 myc234_49h_H_R4 myc234_49h_L_R1
-## AT1G01010.1        2.219990        1.233989        1.573226
-## AT1G01020.1        3.914929        3.517007        3.234192
-## AT1G01030.1        2.916001        2.223473        2.739874
-## AT1G01040.2        6.167261        6.353033        6.281792
-## AT1G01050.1        3.214229        3.600965        3.592212
-## AT1G01060.1        3.966879        3.277037        2.792247
-##             myc234_49h_L_R2 myc234_49h_L_R3 myc234_49h_L_R4 npr_1h_H_R1
-## AT1G01010.1        1.698150        1.497232        1.712310    1.434645
-## AT1G01020.1        3.664084        3.516123        3.254200    4.325541
-## AT1G01030.1        2.570138        2.495792        2.700969    3.718680
-## AT1G01040.2        6.186561        5.953913        6.058515    5.904016
-## AT1G01050.1        3.809425        3.858438        3.644739    3.089192
-## AT1G01060.1        2.675418        3.135975        3.416469    2.667509
-##             npr_1h_H_R2 npr_1h_H_R3 npr_1h_H_R4 npr_1h_L_R1 npr_1h_L_R2
-## AT1G01010.1    1.844851   0.6492527   0.3502921    1.686556    1.607629
-## AT1G01020.1    4.538512   4.0813611   3.8823479    4.386373    4.356917
-## AT1G01030.1    4.142730   3.4523613   2.6372754    3.408049    3.200069
-## AT1G01040.2    5.895030   5.7434314   5.9480153    6.038198    5.853454
-## AT1G01050.1    3.305592   3.2517698   3.4453922    3.191542    3.388151
-## AT1G01060.1    1.986731   0.8897541   2.4322798    1.686586    1.932114
-##             npr_1h_L_R3 npr_1h_L_R4 npr_49h_H_R1 npr_49h_H_R2 npr_49h_H_R3
-## AT1G01010.1    1.790436    1.027665     1.395991    0.6990306    0.8135576
-## AT1G01020.1    3.891259    4.052353     3.571282    3.4169777    3.6003432
-## AT1G01030.1    3.264113    3.509343     2.645627    1.8047369    1.9174879
-## AT1G01040.2    5.831540    5.861203     6.050234    6.0270568    5.6865754
-## AT1G01050.1    3.478218    2.854460     2.979910    3.1363014    3.1420726
-## AT1G01060.1    2.026498    1.449564     2.152205    1.9281882    2.9195075
-##             npr_49h_H_R4 npr_49h_L_R1 npr_49h_L_R2 npr_49h_L_R3
-## AT1G01010.1     1.374960     1.638743     1.030394     1.499096
-## AT1G01020.1     3.327761     3.436185     3.412946     3.652583
-## AT1G01030.1     2.392213     2.716580     2.694559     2.218257
-## AT1G01040.2     5.743867     5.883557     5.966070     5.833331
-## AT1G01050.1     3.309457     3.353956     3.238913     2.967520
-## AT1G01060.1     2.596292     2.438438     2.217078     2.338994
-##             npr_49h_L_R4 sid_1h_H_R1 sid_1h_H_R2 sid_1h_H_R3 sid_1h_H_R4
-## AT1G01010.1    0.5463411    1.830986    1.048455    1.619514    1.205977
-## AT1G01020.1    3.6210757    4.070970    3.846045    3.741230    3.518729
-## AT1G01030.1    2.5444758    3.543187    4.846803    2.851628    2.698024
-## AT1G01040.2    5.8136599    5.977891    5.647961    6.227411    6.080096
-## AT1G01050.1    3.5195377    2.967317    3.996063    3.506345    3.731746
-## AT1G01060.1    2.5445783    2.453314    2.244812    1.821137    2.444624
-##             sid_1h_L_R1 sid_1h_L_R2 sid_1h_L_R3 sid_1h_L_R4 sid_49h_H_R1
-## AT1G01010.1    1.634596   0.9585688    1.957358    1.057632     1.932617
-## AT1G01020.1    4.151707   4.0645552    3.562737    3.590469     3.173383
-## AT1G01030.1    3.751323   3.5080726    2.476523    3.170436     2.581292
-## AT1G01040.2    6.036805   5.9616180    6.015189    5.933857     6.167322
-## AT1G01050.1    3.635426   3.3390447    3.591371    3.664520     3.658862
-## AT1G01060.1    2.295675   1.5297146    1.288234    2.353544     2.355609
-##             sid_49h_H_R2 sid_49h_H_R3 sid_49h_H_R4 sid_49h_L_R1
-## AT1G01010.1     1.885944     2.283260     2.157993     1.573127
-## AT1G01020.1     3.287411     3.778435     2.937570     3.384206
-## AT1G01030.1     1.885944     2.878566     2.241631     2.543242
-## AT1G01040.2     6.178767     5.763409     6.204016     5.959775
-## AT1G01050.1     2.820870     3.488252     3.728297     3.708457
-## AT1G01060.1     2.127667     2.283562     2.467112     2.430379
-##             sid_49h_L_R2 sid_49h_L_R3 sid_49h_L_R4
-## AT1G01010.1     1.279452     1.977396     1.902620
-## AT1G01020.1     3.481957     3.392472     3.542820
-## AT1G01030.1     2.011985     1.801509     2.120207
-## AT1G01040.2     6.096933     6.231190     6.251114
-## AT1G01050.1     2.857019     3.481476     3.383227
-## AT1G01060.1     2.626372     1.601288     1.646348
+## Error in head(log2_cpm): object 'log2_cpm' not found
 ```
 
 ```r
 rownames(log2_cpm) <- gsub("\\.\\d", "", rownames(log2_cpm)) #remove ".digital" after each AGI number
+```
 
+```
+## Error in rownames(log2_cpm): object 'log2_cpm' not found
+```
+
+```r
 #subset to keep Col and myc234 data
 
 log2_cpm <- log2_cpm[, 1:32]
+```
+
+```
+## Error in eval(expr, envir, enclos): object 'log2_cpm' not found
+```
+
+```r
 head(log2_cpm)
 ```
 
 ```
-##           Col_1h_H_R1 Col_1h_H_R2 Col_1h_H_R3 Col_1h_H_R4 Col_1h_L_R1
-## AT1G01010    1.882378    1.549328    1.859647   0.3495007    1.635285
-## AT1G01020    3.949067    3.683874    3.953207   3.4436335    4.073895
-## AT1G01030    3.696947    3.210662    2.962007   2.6341919    3.902603
-## AT1G01040    5.843563    5.850580    6.221438   6.1970707    5.794556
-## AT1G01050    2.905938    2.896108    2.541064   3.3954475    3.352743
-## AT1G01060    1.677548    1.798066    1.944668   1.9036687    2.307554
-##           Col_1h_L_R2 Col_1h_L_R3 Col_1h_L_R4 Col_49h_H_R1 Col_49h_H_R2
-## AT1G01010    1.801100    2.100094    1.656959     1.413971     1.945634
-## AT1G01020    3.578056    3.072618    3.808893     3.766275     2.865233
-## AT1G01030    3.162137    2.617421    3.224172     2.583540     2.971768
-## AT1G01040    5.507127    5.925741    5.981456     6.098855     6.306458
-## AT1G01050    2.946565    2.710932    3.369243     2.525135     3.494090
-## AT1G01060    2.577782    2.294226    1.884485     1.946339     2.476123
-##           Col_49h_H_R3 Col_49h_H_R4 Col_49h_L_R1 Col_49h_L_R2 Col_49h_L_R3
-## AT1G01010     1.649226     1.766327     0.923243     2.123812     1.651207
-## AT1G01020     3.022739     3.619991     3.535360     2.948178     3.293433
-## AT1G01030     1.852584     2.275897     2.752061     1.518938     2.208194
-## AT1G01040     6.183816     6.171833     6.026365     6.075158     5.883716
-## AT1G01050     3.650059     3.561742     3.779102     3.315543     3.606511
-## AT1G01060     2.399045     2.412533     2.357204     1.519145     1.537809
-##           Col_49h_L_R4 myc234_1h_H_R1 myc234_1h_H_R2 myc234_1h_H_R3
-## AT1G01010    0.8023493       1.797646       1.404666       1.814659
-## AT1G01020    3.4158655       3.507903       3.763755       3.533415
-## AT1G01030    2.1608279       3.285590       3.037048       2.986202
-## AT1G01040    5.9073507       6.066964       6.179175       6.176655
-## AT1G01050    3.7868386       2.846255       2.843656       3.294573
-## AT1G01060    2.8480933       2.670511       2.801847       2.690827
-##           myc234_1h_H_R4 myc234_1h_L_R1 myc234_1h_L_R2 myc234_1h_L_R3
-## AT1G01010       1.870886       1.800710       1.634296       1.697148
-## AT1G01020       3.067659       3.700881       3.706913       3.854970
-## AT1G01030       3.067319       3.746268       2.832237       3.576841
-## AT1G01040       5.984254       6.051525       6.007243       5.995317
-## AT1G01050       2.961914       3.417822       3.285188       3.956161
-## AT1G01060       2.848463       1.993103       2.433099       3.145842
-##           myc234_1h_L_R4 myc234_49h_H_R1 myc234_49h_H_R2 myc234_49h_H_R3
-## AT1G01010       1.432521        1.835804        2.212671        2.219990
-## AT1G01020       3.331111        3.036812        3.509414        3.914929
-## AT1G01030       3.014341        2.353753        2.157760        2.916001
-## AT1G01040       6.059650        6.452842        6.463489        6.167261
-## AT1G01050       3.838977        3.304964        3.301476        3.214229
-## AT1G01060       2.963156        2.941554        2.709542        3.966879
-##           myc234_49h_H_R4 myc234_49h_L_R1 myc234_49h_L_R2 myc234_49h_L_R3
-## AT1G01010        1.233989        1.573226        1.698150        1.497232
-## AT1G01020        3.517007        3.234192        3.664084        3.516123
-## AT1G01030        2.223473        2.739874        2.570138        2.495792
-## AT1G01040        6.353033        6.281792        6.186561        5.953913
-## AT1G01050        3.600965        3.592212        3.809425        3.858438
-## AT1G01060        3.277037        2.792247        2.675418        3.135975
-##           myc234_49h_L_R4
-## AT1G01010        1.712310
-## AT1G01020        3.254200
-## AT1G01030        2.700969
-## AT1G01040        6.058515
-## AT1G01050        3.644739
-## AT1G01060        3.416469
+## Error in head(log2_cpm): object 'log2_cpm' not found
 ```
 
 ```r
 #
 cpm.wide <- bind_cols(tibble(gene_id=rownames(log2_cpm)),as_tibble(log2_cpm)) 
+```
+
+```
+## Error in rownames(log2_cpm): object 'log2_cpm' not found
+```
+
+```r
 cpm.wide
 ```
 
 ```
-## # A tibble: 17,328 x 33
-##    gene_id Col_1h_H_R1 Col_1h_H_R2 Col_1h_H_R3 Col_1h_H_R4 Col_1h_L_R1
-##    <chr>         <dbl>       <dbl>       <dbl>       <dbl>       <dbl>
-##  1 AT1G01…        1.88        1.55        1.86       0.350        1.64
-##  2 AT1G01…        3.95        3.68        3.95       3.44         4.07
-##  3 AT1G01…        3.70        3.21        2.96       2.63         3.90
-##  4 AT1G01…        5.84        5.85        6.22       6.20         5.79
-##  5 AT1G01…        2.91        2.90        2.54       3.40         3.35
-##  6 AT1G01…        1.68        1.80        1.94       1.90         2.31
-##  7 AT1G01…        2.30        2.36        1.66       1.55         1.64
-##  8 AT1G01…        6.35        6.27        6.40       6.44         6.39
-##  9 AT1G01…        8.00        7.83        7.87       7.90         7.76
-## 10 AT1G01…        9.12        9.15        8.92       8.90         8.86
-## # … with 17,318 more rows, and 27 more variables: Col_1h_L_R2 <dbl>,
-## #   Col_1h_L_R3 <dbl>, Col_1h_L_R4 <dbl>, Col_49h_H_R1 <dbl>,
-## #   Col_49h_H_R2 <dbl>, Col_49h_H_R3 <dbl>, Col_49h_H_R4 <dbl>,
-## #   Col_49h_L_R1 <dbl>, Col_49h_L_R2 <dbl>, Col_49h_L_R3 <dbl>,
-## #   Col_49h_L_R4 <dbl>, myc234_1h_H_R1 <dbl>, myc234_1h_H_R2 <dbl>,
-## #   myc234_1h_H_R3 <dbl>, myc234_1h_H_R4 <dbl>, myc234_1h_L_R1 <dbl>,
-## #   myc234_1h_L_R2 <dbl>, myc234_1h_L_R3 <dbl>, myc234_1h_L_R4 <dbl>,
-## #   myc234_49h_H_R1 <dbl>, myc234_49h_H_R2 <dbl>, myc234_49h_H_R3 <dbl>,
-## #   myc234_49h_H_R4 <dbl>, myc234_49h_L_R1 <dbl>, myc234_49h_L_R2 <dbl>,
-## #   myc234_49h_L_R3 <dbl>, myc234_49h_L_R4 <dbl>
+## Error in eval(expr, envir, enclos): object 'cpm.wide' not found
 ```
 # plot ("up" in myc324 (logFC.gtmyc234>0))
 
@@ -909,13 +1697,29 @@ names(DEG.list)
 ```r
 # npr1-1 misregulated genes 
 plot.data<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide,by="gene_id") %>% unite(AGI_desc,c("gene_id","name")) %>% dplyr::select(-LR,-PValue,-X1,-logCPM) 
+```
+
+```
+## Error in tbl_vars(y): object 'cpm.wide' not found
+```
+
+```r
 # plot: use labeller = label_wrap_gen(width=10) for multiple line in each gene name
 p.up<-plot.data %>% filter(logFC.gtmyc234>0 & FDR<1e-10) %>% dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description) %>%  gather(sample,value,-1) %>%
   separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=fct_relevel(treatment,"H"),y=value,color=genotype,shape=rep)) + geom_jitter() + facet_wrap(AGI_desc~.,scale="free",ncol=5,labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="up (logFC.gtmyc234>0)")
+```
+
+```
+## Error in eval(lhs, parent, parent): object 'plot.data' not found
+```
+
+```r
 p.up
 ```
 
-![](MYC234_PIF4target_files/figure-html/unnamed-chunk-11-1.png)<!-- -->
+```
+## Error in eval(expr, envir, enclos): object 'p.up' not found
+```
 # plot ("down" in myc324 (logFC.gtmyc234>0))
 
 ```r
@@ -935,13 +1739,29 @@ names(DEG.list)
 ```r
 # npr1-1 misregulated genes 
 plot.data<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide,by="gene_id") %>% unite(AGI_desc,c("gene_id","name")) %>% dplyr::select(-LR,-PValue,-X1,-logCPM) 
+```
+
+```
+## Error in tbl_vars(y): object 'cpm.wide' not found
+```
+
+```r
 # plot: use labeller = label_wrap_gen(width=10) for multiple line in each gene name
 p.down<-plot.data %>% filter(logFC.gtmyc234<0 & FDR<1e-100) %>% dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description) %>%  gather(sample,value,-1) %>%
   separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=fct_relevel(treatment,"H"),y=value,color=genotype,shape=rep)) + geom_jitter() + facet_wrap(AGI_desc~.,scale="free",ncol=5,labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="down (logFC.gtmyc234<0)")
+```
+
+```
+## Error in eval(lhs, parent, parent): object 'plot.data' not found
+```
+
+```r
 p.down
 ```
 
-![](MYC234_PIF4target_files/figure-html/unnamed-chunk-12-1.png)<!-- -->
+```
+## Error in eval(expr, envir, enclos): object 'p.down' not found
+```
 
 
 # Session info
@@ -953,7 +1773,7 @@ sessionInfo()
 ```
 ## R version 3.5.1 (2018-07-02)
 ## Platform: x86_64-apple-darwin15.6.0 (64-bit)
-## Running under: macOS  10.14.4
+## Running under: macOS  10.14.5
 ## 
 ## Matrix products: default
 ## BLAS: /Library/Frameworks/R.framework/Versions/3.5/Resources/lib/libRblas.0.dylib
@@ -987,35 +1807,35 @@ sessionInfo()
 ## [21] bit_1.1-14                  compiler_3.5.1             
 ## [23] cli_1.1.0                   rvest_0.3.2                
 ## [25] Biobase_2.40.0              xml2_1.2.0                 
-## [27] DelayedArray_0.6.6          labeling_0.3               
-## [29] rtracklayer_1.40.6          scales_1.0.0               
-## [31] digest_0.6.18               Rsamtools_1.32.3           
-## [33] rmarkdown_1.12              XVector_0.20.0             
-## [35] pkgconfig_2.0.2             htmltools_0.3.6            
-## [37] htmlwidgets_1.3             rlang_0.3.4                
-## [39] rstudioapi_0.10             RSQLite_2.1.1              
-## [41] generics_0.0.2              jsonlite_1.6               
-## [43] BiocParallel_1.14.2         RCurl_1.95-4.12            
-## [45] magrittr_1.5                GO.db_3.6.0                
-## [47] GenomeInfoDbData_1.1.0      Matrix_1.2-17              
-## [49] fansi_0.4.0                 Rcpp_1.0.1                 
-## [51] munsell_0.5.0               S4Vectors_0.18.3           
-## [53] stringi_1.4.3               yaml_2.2.0                 
-## [55] MASS_7.3-51.3               SummarizedExperiment_1.10.1
-## [57] zlibbioc_1.26.0             plyr_1.8.4                 
-## [59] grid_3.5.1                  blob_1.1.1                 
-## [61] parallel_3.5.1              crayon_1.3.4               
-## [63] lattice_0.20-38             Biostrings_2.48.0          
-## [65] haven_2.1.0                 GenomicFeatures_1.32.3     
-## [67] hms_0.4.2                   locfit_1.5-9.1             
-## [69] knitr_1.22                  pillar_1.3.1               
-## [71] GenomicRanges_1.32.7        biomaRt_2.36.1             
-## [73] stats4_3.5.1                XML_3.98-1.19              
-## [75] glue_1.3.1                  evaluate_0.13              
-## [77] data.table_1.12.0           modelr_0.1.4               
-## [79] cellranger_1.1.0            gtable_0.3.0               
-## [81] assertthat_0.2.1            xfun_0.5                   
-## [83] broom_0.5.1                 viridisLite_0.3.0          
-## [85] GenomicAlignments_1.16.0    AnnotationDbi_1.42.1       
-## [87] memoise_1.1.0               IRanges_2.14.12
+## [27] DelayedArray_0.6.6          rtracklayer_1.40.6         
+## [29] scales_1.0.0                digest_0.6.18              
+## [31] Rsamtools_1.32.3            rmarkdown_1.12             
+## [33] XVector_0.20.0              pkgconfig_2.0.2            
+## [35] htmltools_0.3.6             htmlwidgets_1.3            
+## [37] rlang_0.3.4                 rstudioapi_0.10            
+## [39] RSQLite_2.1.1               generics_0.0.2             
+## [41] jsonlite_1.6                BiocParallel_1.14.2        
+## [43] RCurl_1.95-4.12             magrittr_1.5               
+## [45] GO.db_3.6.0                 GenomeInfoDbData_1.1.0     
+## [47] Matrix_1.2-17               fansi_0.4.0                
+## [49] Rcpp_1.0.1                  munsell_0.5.0              
+## [51] S4Vectors_0.18.3            stringi_1.4.3              
+## [53] yaml_2.2.0                  MASS_7.3-51.3              
+## [55] SummarizedExperiment_1.10.1 zlibbioc_1.26.0            
+## [57] plyr_1.8.4                  grid_3.5.1                 
+## [59] blob_1.1.1                  parallel_3.5.1             
+## [61] crayon_1.3.4                lattice_0.20-38            
+## [63] Biostrings_2.48.0           haven_2.1.0                
+## [65] GenomicFeatures_1.32.3      hms_0.4.2                  
+## [67] locfit_1.5-9.1              knitr_1.22                 
+## [69] pillar_1.3.1                GenomicRanges_1.32.7       
+## [71] biomaRt_2.36.1              stats4_3.5.1               
+## [73] XML_3.98-1.19               glue_1.3.1                 
+## [75] evaluate_0.13               data.table_1.12.0          
+## [77] modelr_0.1.4                cellranger_1.1.0           
+## [79] gtable_0.3.0                assertthat_0.2.1           
+## [81] xfun_0.5                    broom_0.5.1                
+## [83] viridisLite_0.3.0           GenomicAlignments_1.16.0   
+## [85] AnnotationDbi_1.42.1        memoise_1.1.0              
+## [87] IRanges_2.14.12
 ```

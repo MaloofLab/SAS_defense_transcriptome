@@ -36,6 +36,13 @@ PIFcomplex<-c("AT5G11260","AT5G02760")
 At.PIFtarget.list<-list(PIFup=PIFup,PIFdown=PIFdown,PIFcomplex=PIFcomplex)
 ```
 # convert into custom category list
+# prep for GOseq with custom category
+```{r}
+ # bias.data vector must have the same length as DEgenes vector! 
+getwd()
+At_cdna<-Biostrings::readDNAStringSet("https://www.arabidopsis.org/download_files/Sequences/TAIR10_blastsets/TAIR10_cdna_20110103_representative_gene_model_updated")
+At_cdna
+```
 # format At.PIFtarget.list2 into goseq() compatible list (run once)
 ```{r eval=FALSE}
 # extract AGI from At_cdna
@@ -61,17 +68,17 @@ names(temp.list)<-test3 %>% pull(AGI)
 # split concatanated categories in each gene
 At.PIFtarget.list2<-lapply(temp.list,function(x) unlist(strsplit(x, split=",")))
 # save
-save(At.PIFtarget.list2,file="..","output","At.PIFtarget.list2.Rdata")
+save(At.PIFtarget.list2,file=file.path("..","output","At.PIFtarget.list2.Rdata"))
 
 ```
 
 
 # prep for GOseq with custom category
 ```{r}
- # bias.data vector must have the same length as DEgenes vector! 
-getwd()
-At_cdna<-Biostrings::readDNAStringSet("https://www.arabidopsis.org/download_files/Sequences/TAIR10_blastsets/TAIR10_cdna_20110103_representative_gene_model_updated")
-At_cdna
+#  # bias.data vector must have the same length as DEgenes vector! 
+# getwd()
+# At_cdna<-Biostrings::readDNAStringSet("https://www.arabidopsis.org/download_files/Sequences/TAIR10_blastsets/TAIR10_cdna_20110103_representative_gene_model_updated")
+# At_cdna
 
 ## if you want to test expressed genes as background, add background in this function
 load(file.path("..","output","At.PIFtarget.list2.Rdata"))
@@ -133,6 +140,9 @@ GOseq.At.customcat.ORA(genelist=At.PIFtarget.list[[1]],custom.category.list=At.P
 # GO.ORA for each DEG list (loop)
 ```{r message=FALSE, error=TRUE}
 names(DEG.list)
+# make special output directory
+dir.create(path=file.path("..","output","doubleCoef"))
+#
 for(n in 1:14) {
   genelist.all<-DEG.list[[n]]
 # DEG.list[[n]]  %>%  dplyr::filter((as.name(names(DEG.list[[n]])[2]))>0)  # does not work
@@ -140,11 +150,22 @@ genelist.upup<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[
     genelist.updown<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[2])))>0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))<0)
         genelist.downup<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[2])))<0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))>0)
     genelist.downdown<-  DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[2])))<0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))<0)
-GO.ORA.temp.all<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.all[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
-    GO.ORA.temp.up_up<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.upup[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
-    GO.ORA.temp.up_down<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.updown[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
-    GO.ORA.temp.down_up<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.downup[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
-    GO.ORA.temp.down_down<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.downdown[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
+#    if(as_vector(genelist.all[,"gene_id"]) ***) { # under construciton. Do not use this form this time.
+# if genelist.all[,"gene_id"] has "AT***.1" pattern (with splicing variants)
+#GO.ORA.temp.all<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.all[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
+#    GO.ORA.temp.up_up<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.upup[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
+#    GO.ORA.temp.up_down<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.updown[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
+#    GO.ORA.temp.down_up<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.downup[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
+#    GO.ORA.temp.down_down<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.downdown[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
+#    } else {
+# if genelist.all[,"gene_id"] has no spricing variant version (only AGI name)
+    GO.ORA.temp.all<-GOseq.At.customcat.ORA(as_vector(genelist.all[,"gene_id"]),custom.category.list=At.PIFtarget.list2)
+    GO.ORA.temp.up_up<-GOseq.At.customcat.ORA(as_vector(genelist.upup[,"gene_id"]),custom.category.list=At.PIFtarget.list2)
+    GO.ORA.temp.up_down<-GOseq.At.customcat.ORA(as_vector(genelist.updown[,"gene_id"]),custom.category.list=At.PIFtarget.list2)
+    GO.ORA.temp.down_up<-GOseq.At.customcat.ORA(as_vector(genelist.downup[,"gene_id"]),custom.category.list=At.PIFtarget.list2)
+    GO.ORA.temp.down_down<-GOseq.At.customcat.ORA(as_vector(genelist.downdown[,"gene_id"]),custom.category.list=At.PIFtarget.list2)
+ #   }
+    
     # handling "no enriched GO" 
     # genelist.names<-c("GO.ORA.temp.up_down","GO.ORA.temp.down_up") # test
     x<-list(GO.ORA.temp.all=GO.ORA.temp.all,
@@ -154,12 +175,12 @@ GO.ORA.temp.all<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.all[,"gene
             GO.ORA.temp.down_down=GO.ORA.temp.down_down) # list
     print(x[x=="no enriched GO"])
     x<-x[!x=="no enriched GO"] # reove "no enriched GO" result
-    ## add sample info and FC info and save GO.ORA result
+    ## add sample info and FC info and save GO.ORA result (this is not working well; 072819)
     ## avoid error with x is empty
     if(length(x)==0) {next} else {
   for (i in 1:length(x)) {
       GO.ORA.result<-x[[i]] %>% mutate(FC = gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),sample=DEG.objs[n])
-    save(GO.ORA.result,file=file.path("..","output",paste(gsub(".csv","",DEG.objs[n]),gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),"enrich.Rdata",sep=".")))
+    save(GO.ORA.result,file=file.path("..","output","doubleCoef",paste(gsub(".csv","",DEG.objs[n]),gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),"enrich.Rdata",sep=".")))
     rm(GO.ORA.result)
   }
     } 
@@ -169,21 +190,20 @@ GO.ORA.temp.all<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.all[,"gene
 
 # read GOseq result table
 ```{r messages=FALSE}
-eGOseqs<-list.files(pattern="enrich.Rdata",path=file.path("..","output"))
-eGOseqs.list2<-sapply(file.path("..","output",eGOseqs),function(x) mget(load(x))) # mget will return the value of the object(or objects) in a list. see https://stackoverflow.com/questions/29398630/load-data-frames-into-list
+eGOseqs<-list.files(pattern="enrich.Rdata",path=file.path("..","output","doubleCoef"))
+eGOseqs.list2<-sapply(file.path("..","output","doubleCoef",eGOseqs),function(x) mget(load(x))) # mget will return the value of the object(or objects) in a list. see https://stackoverflow.com/questions/29398630/load-data-frames-into-list
 #names(eGOseqs.list2)
 eGOseqs.list2.summary<-do.call("rbind",eGOseqs.list2) 
 #head(eGOseqs.list2.summary) # make sure those are file names
 rownames(eGOseqs.list2.summary)<-1:nrow(eGOseqs.list2.summary)
 View(eGOseqs.list2.summary)
 # write in csv file
-write_csv(eGOseqs.list2.summary,path=file.path("..","output","PIFtarget.eGOseqs.list2.summary.csv"))
+write_csv(eGOseqs.list2.summary,path=file.path("..","output","doubleCoef","PIFtarget.eGOseqs.list2.summary.v2.csv"))
 ```
 
 # plotting expression pattern
 ```{r}
 ###import dge.data and calculate cpm
-```{r}
 # fo Kazu
  if(Sys.info()["user"]=="nozue") { 
 load(file.path("~","Box","Chunmei_Myc_Paper","manuscripts","output/dge.Rdata"))
