@@ -245,6 +245,74 @@ p.down<-plot.data %>% filter(logFC.gtmyc234<0 & FDR<1e-100) %>% dplyr::select(-l
   separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=fct_relevel(treatment,"H"),y=value,color=genotype,shape=rep)) + geom_jitter() + facet_wrap(AGI_desc~.,scale="free",ncol=5,labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="down (logFC.gtmyc234<0)")
 p.down
 ```
+# plot "Col and myc234 at 49h high and low RFR" (requested by Julin on July 28, 2019). under construction
+```{r}
+names(DEG.list)
+plot.data<-
+  DEG.list[["DEgenes.Col.49h.rH"]] 
+  DEG.list[["DEgenes.myc234.49h.rCol.rH"]] 
+
+%>% left_join(cpm.wide,by="gene_id") %>% unite(AGI_desc,c("gene_id","name")) %>% dplyr::select(-LR,-PValue,-X1,-logCPM) 
+# plot: use labeller = label_wrap_gen(width=10) for multiple line in each gene name
+p.down<-plot.data %>% filter(logFC.gtmyc234<0 & FDR<1e-100) %>% dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description) %>%  gather(sample,value,-1) %>%
+  separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=fct_relevel(treatment,"H"),y=value,color=genotype,shape=rep)) + geom_jitter() + facet_wrap(AGI_desc~.,scale="free",ncol=5,labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="down (logFC.gtmyc234<0)")
+p.down
+```
+
+# expression pattern of overlapped genes between PIFtargets and 
+### Using more comprehensive gene list to make gene presence or absence table (under construction)
+```{r}
+# # combine all DEG tables and PIFtargets and have union of DEG names (DEG.unique)
+DEG.list
+# test<-do.call(rbind.data.frame,DEG.count.list.e1.v3.0annotation) # error
+temp<-DEG.list[[1]]$gene_id
+for(i in 2:length(names(DEG.list))) {temp<-c(temp,DEG.list[[i]]$gene_id)}
+temp<-c(temp,PIFup,PIFdown,PIFcomplex)
+DEG.unique<-unique(temp)
+# using the DEG.unique, assign 1 (present) or 0 (absent) in a given DEGs list
+DEG.DF<-data.frame(genes=DEG.unique)
+for(i in 1:length(names(DEG.list))) {
+DEG<-DEG.list[[i]]$gene_id
+temp2<-rep(0,length(DEG.unique))
+temp2[DEG.unique %in% DEG]<-1
+DEG.DF<-cbind(DEG.DF,temp2)
+}
+names(DEG.DF)[-1]<-names(DEG.list)
+# add PIFtargets
+## PIFup
+temp2<-rep(0,length(DEG.unique))
+temp2[DEG.unique %in% PIFup]<-1
+DEG.DF$PIFup<-temp2
+## PIFdown
+temp2<-rep(0,length(DEG.unique))
+temp2[DEG.unique %in% PIFdown]<-1
+DEG.DF$PIFdown<-temp2
+## PIFcomplex
+temp2<-rep(0,length(DEG.unique))
+temp2[DEG.unique %in% PIFcomplex]<-1
+DEG.DF$PIFcomplex<-temp2
+### this DEG.DF is useless for up_up etc.
+# 
+DEG.DF[DEG.DF[,"DEgenes.myc234.49h.rCol.rH"]==1&DEG.DF[,"PIFup"]==1,]
+```
+# ver2
+```{r}
+# DEgenes.myc234.49h.rCol.rH
+plot.data.up_up<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  %>% filter(logFC.gtmyc234>0 & logFC.gtmyc234.trtL>0) 
+plot.data.up_down<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  %>% filter(logFC.gtmyc234>0 & logFC.gtmyc234.trtL<0) 
+plot.data.down_up<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  %>% filter(logFC.gtmyc234<0 & logFC.gtmyc234.trtL>0) 
+plot.data.down_down<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  %>% filter(logFC.gtmyc234<0 & logFC.gtmyc234.trtL<0) 
+
+
+
+# plot: use labeller = label_wrap_gen(width=10) for multiple line in each gene name
+# up_up
+p.down<-plot.data.up_down %>% inner_join(tibble(gene_id=PIFup),by="gene_id") %>%  dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description) %>%  gather(sample,value,-1) %>%
+  separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=fct_relevel(treatment,"H"),y=value,color=genotype,shape=rep)) + geom_jitter() + facet_wrap(AGI_desc~.,scale="free",ncol=5,labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="down (logFC.gtmyc234<0)")
+p.down
+
+
+```
 
 
 # Session info
