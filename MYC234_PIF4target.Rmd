@@ -21,14 +21,8 @@ library(edgeR)
 library(readxl)
 library(goseq) # goseq
 ```
-# read custom category list
+# PIFtarget list
 ```{r}
-#load("../input/At.hormone.responsive.list.Rdata")
-# load custom categories
-load(file.path("..","input","hormone.responsiveness6.DF.s.Rdata")) # using SAup_combined & SAdown_combined
-#hormone.responsiveness6.DF.s %>% dplyr::select(PIFtarget)
-#At.hormone.responsive.list<-read_xlsx(path=file.path("..","input","Supplemental_Dataset3_source_of_custom_categories.xlsx"),sheet=1,skip=15)
-#At.hormone.responsive.list %>% dplyr::select(PIFtarget)
 # from tpc120857_SupplementalTable1.pdf (Leivar and Monte, 2014)
 PIFup<-c("AT5G39860","AT5G15160","AT4G16780","AT2G44910","AT5G47370","AT3G60390","AT1G18400","AT1G69010","AT1G03790","AT1G02340","AT1G14920","AT2G42870","AT2G46970","AT3G62090","AT2G43060","AT5G02200","AT2G37678","AT1G52830","AT1G04250","AT1G09570","AT4G28720","AT1G04180","AT1G70560","AT4G39950","AT4G27260","AT1G70940","AT3G14370","AT5G18010","AT4G37770","AT5G65800","AT1G02400","AT5G07010","AT5G07000","AT1G75450","AT4G10240","AT4G32280","AT3G15540","AT5G04190","AT4G25470")
 PIFdown<-c("AT1G06040","AT5G44190","AT4G26150","AT5G56860","AT5G13630","AT1G70700","AT1G05010","AT5G67030","AT1G01060","AT2G46830")
@@ -114,11 +108,11 @@ GOseq.At.customcat.ORA<-function(genelist,padjust=0.05,custom.category.list=At.h
 
 # Importing enrichment result table and have summary table: Table of DEGs (under construction)
 ```{r message=FALSE, error=TRUE}
-# Ding (2018) Cell DEGs
 list.files(path=file.path("..","output","DEGs_with_description"),pattern=".csv") # finding files in different blogs did not work.. Did work this time... why?
 getwd()
 DEG.objs<-list.files(path=file.path("..","output","DEGs_with_description"),pattern="\\.csv$") # under construction
-DEG.objs
+# only Col and myc234
+DEG.objs<-grep("(\\.Col|\\.myc234)",DEG.objs,value=TRUE)
 # read csv file
 DEG.list<-lapply(DEG.objs, function(x) read_csv(paste(file.path("..","output","DEGs_with_description"),"/",x,sep="")))
 names(DEG.list)<-gsub(".csv","",DEG.objs)
@@ -142,14 +136,40 @@ GOseq.At.customcat.ORA(genelist=At.PIFtarget.list[[1]],custom.category.list=At.P
 names(DEG.list)
 # make special output directory
 dir.create(path=file.path("..","output","doubleCoef"))
-#
-for(n in 1:14) {
+# for single
+for(n in c(1,2,4,6)) {
+  genelist.all<-DEG.list[[n]]
+  genelist.up<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))>0)
+  genelist.down<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))<0)
+  GO.ORA.temp.all<-GOseq.At.customcat.ORA(as_vector(genelist.all[,"gene_id"]),custom.category.list=At.PIFtarget.list2)
+    GO.ORA.temp.up<-GOseq.At.customcat.ORA(as_vector(genelist.up[,"gene_id"]),custom.category.list=At.PIFtarget.list2)
+    GO.ORA.temp.down<-GOseq.At.customcat.ORA(as_vector(genelist.down[,"gene_id"]),custom.category.list=At.PIFtarget.list2)
+    # handling "no enriched GO" 
+    # genelist.names<-c("GO.ORA.temp.up_down","GO.ORA.temp.down_up") # test
+    x<-list(GO.ORA.temp.all=GO.ORA.temp.all,
+      GO.ORA.temp.up=GO.ORA.temp.up,
+            GO.ORA.temp.down=GO.ORA.temp.down) # list
+    print(x[x=="no enriched GO"])
+    x<-x[!x=="no enriched GO"] # reove "no enriched GO" result
+    ## add sample info and FC info and save GO.ORA result (this is not working well; 072819)
+    ## avoid error with x is empty
+    if(length(x)==0) {next} else {
+  for (i in 1:length(x)) {
+      GO.ORA.result<-x[[i]] %>% mutate(FC = gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),sample=DEG.objs[n])
+    save(GO.ORA.result,file=file.path("..","output","doubleCoef",paste(gsub(".csv","",DEG.objs[n]),gsub("(GO.ORA.temp.)(.)","\\2",names(x)[i]),"enrich.Rdata",sep=".")))
+    rm(GO.ORA.result)
+  }
+    }
+}
+
+# for double coefficint table (needs to fix)
+for(n in c(3,5)) {
   genelist.all<-DEG.list[[n]]
 # DEG.list[[n]]  %>%  dplyr::filter((as.name(names(DEG.list[[n]])[2]))>0)  # does not work
-genelist.upup<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[2])))>0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))>0)
-    genelist.updown<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[2])))>0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))<0)
-        genelist.downup<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[2])))<0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))>0)
-    genelist.downdown<-  DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[2])))<0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))<0)
+genelist.upup<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))>0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[4])))>0)
+    genelist.updown<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))>0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[4])))<0)
+        genelist.downup<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))<0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[4])))>0)
+    genelist.downdown<-  DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[3])))<0) %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[4])))<0)
 #    if(as_vector(genelist.all[,"gene_id"]) ***) { # under construciton. Do not use this form this time.
 # if genelist.all[,"gene_id"] has "AT***.1" pattern (with splicing variants)
 #GO.ORA.temp.all<-GOseq.At.customcat.ORA(str_remove(as_vector(genelist.all[,"gene_id"]),"\\.[[:digit:]]+"),custom.category.list=At.PIFtarget.list2)
@@ -165,7 +185,6 @@ genelist.upup<-DEG.list[[n]] %>% dplyr::filter((UQ(as.name(names(DEG.list[[n]])[
     GO.ORA.temp.down_up<-GOseq.At.customcat.ORA(as_vector(genelist.downup[,"gene_id"]),custom.category.list=At.PIFtarget.list2)
     GO.ORA.temp.down_down<-GOseq.At.customcat.ORA(as_vector(genelist.downdown[,"gene_id"]),custom.category.list=At.PIFtarget.list2)
  #   }
-    
     # handling "no enriched GO" 
     # genelist.names<-c("GO.ORA.temp.up_down","GO.ORA.temp.down_up") # test
     x<-list(GO.ORA.temp.all=GO.ORA.temp.all,
@@ -198,7 +217,7 @@ eGOseqs.list2.summary<-do.call("rbind",eGOseqs.list2)
 rownames(eGOseqs.list2.summary)<-1:nrow(eGOseqs.list2.summary)
 View(eGOseqs.list2.summary)
 # write in csv file
-write_csv(eGOseqs.list2.summary,path=file.path("..","output","doubleCoef","PIFtarget.eGOseqs.list2.summary.v2.csv"))
+write_csv(eGOseqs.list2.summary,path=file.path("..","output","doubleCoef","PIFtarget.eGOseqs.list2.summary.v3.csv"))
 ```
 
 # plotting expression pattern
@@ -259,59 +278,39 @@ p.down<-plot.data %>% filter(logFC.gtmyc234<0 & FDR<1e-100) %>% dplyr::select(-l
 p.down
 ```
 
-# expression pattern of overlapped genes between PIFtargets and 
-### Using more comprehensive gene list to make gene presence or absence table (under construction)
+# expression pattern of overlapped genes between PIFtargets
+# DEgenes.myc234.1h.rCol.rH
 ```{r}
-# # combine all DEG tables and PIFtargets and have union of DEG names (DEG.unique)
-DEG.list
-# test<-do.call(rbind.data.frame,DEG.count.list.e1.v3.0annotation) # error
-temp<-DEG.list[[1]]$gene_id
-for(i in 2:length(names(DEG.list))) {temp<-c(temp,DEG.list[[i]]$gene_id)}
-temp<-c(temp,PIFup,PIFdown,PIFcomplex)
-DEG.unique<-unique(temp)
-# using the DEG.unique, assign 1 (present) or 0 (absent) in a given DEGs list
-DEG.DF<-data.frame(genes=DEG.unique)
-for(i in 1:length(names(DEG.list))) {
-DEG<-DEG.list[[i]]$gene_id
-temp2<-rep(0,length(DEG.unique))
-temp2[DEG.unique %in% DEG]<-1
-DEG.DF<-cbind(DEG.DF,temp2)
-}
-names(DEG.DF)[-1]<-names(DEG.list)
-# add PIFtargets
-## PIFup
-temp2<-rep(0,length(DEG.unique))
-temp2[DEG.unique %in% PIFup]<-1
-DEG.DF$PIFup<-temp2
-## PIFdown
-temp2<-rep(0,length(DEG.unique))
-temp2[DEG.unique %in% PIFdown]<-1
-DEG.DF$PIFdown<-temp2
-## PIFcomplex
-temp2<-rep(0,length(DEG.unique))
-temp2[DEG.unique %in% PIFcomplex]<-1
-DEG.DF$PIFcomplex<-temp2
-### this DEG.DF is useless for up_up etc.
-# 
-DEG.DF[DEG.DF[,"DEgenes.myc234.49h.rCol.rH"]==1&DEG.DF[,"PIFup"]==1,]
-```
-# ver2
-```{r}
-# DEgenes.myc234.49h.rCol.rH
-plot.data.up_up<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  %>% filter(logFC.gtmyc234>0 & logFC.gtmyc234.trtL>0) 
-plot.data.up_down<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  %>% filter(logFC.gtmyc234>0 & logFC.gtmyc234.trtL<0) 
-plot.data.down_up<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  %>% filter(logFC.gtmyc234<0 & logFC.gtmyc234.trtL>0) 
-plot.data.down_down<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  %>% filter(logFC.gtmyc234<0 & logFC.gtmyc234.trtL<0) 
-
-
+plot.data.down_down<-DEG.list[["DEgenes.myc234.1h.rCol.rH"]] %>% left_join(cpm.wide,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  %>% filter(logFC.gtmyc234<0 & logFC.gtmyc234.trtL<0) 
 
 # plot: use labeller = label_wrap_gen(width=10) for multiple line in each gene name
-# up_up
-p.down<-plot.data.up_down %>% inner_join(tibble(gene_id=PIFup),by="gene_id") %>%  dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description) %>%  gather(sample,value,-1) %>%
-  separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=fct_relevel(treatment,"H"),y=value,color=genotype,shape=rep)) + geom_jitter() + facet_wrap(AGI_desc~.,scale="free",ncol=5,labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="down (logFC.gtmyc234<0)")
-p.down
+# p.myc234.49h.rCol.rH.down_down.PIFup
+p.myc234.1h.rCol.rH.down_down.PIFcomplex<-plot.data.down_down %>% inner_join(tibble(gene_id=PIFcomplex),by="gene_id") %>%  dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description,-gene_id,-name) %>%  gather(sample,value,-1) %>%
+  separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=fct_relevel(treatment,"H"),y=value,color=genotype,shape=rep)) + geom_jitter() + facet_wrap(AGI_desc~.,scale="free",ncol=5,labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="1h down_down \n(logFC.gtmyc234<0 & logFC.gtmyc234.trtL<0) \n& PIFcomplex")
+p.myc234.1h.rCol.rH.down_down.PIFcomplex
+ggsave(p.myc234.1h.rCol.rH.down_down.PIFcomplex,file=file.path("..","output","doubleCoef","p.myc234.1h.rCol.rH.down_down.PIFcomplex.png"),height=3,width=5)
 
+```
+# DEgenes.myc234.49h.rCol.rH down_down & PIFup
+```{r}
+plot.data.down_down<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  %>% filter(logFC.gtmyc234<0 & logFC.gtmyc234.trtL<0) 
+# plot: use labeller = label_wrap_gen(width=10) for multiple line in each gene name
+# p.myc234.49h.rCol.rH.down_down.PIFup
+p.myc234.49h.rCol.rH.down_down.PIFup<-plot.data.down_down %>% inner_join(tibble(gene_id=PIFup),by="gene_id") %>%  dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description,-gene_id,-name) %>%  gather(sample,value,-1) %>%
+  separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=fct_relevel(treatment,"H"),y=value,color=genotype,shape=rep)) + geom_jitter() + facet_wrap(AGI_desc~.,scale="free",ncol=5,labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="down_down \n(logFC.gtmyc234<0 & logFC.gtmyc234.trtL<0) \n& PIFup")
+p.myc234.49h.rCol.rH.down_down.PIFup
+ggsave(p.myc234.49h.rCol.rH.down_down.PIFup,file=file.path("..","output","doubleCoef","p.myc234.49h.rCol.rH.down_down.PIFup.png"),height=3,width=8)
 
+```
+# p.myc234.49h.rCol.rH.up_down.PIFcomplex
+```{r}
+# up_down
+plot.data.up_down<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  %>% filter(logFC.gtmyc234>0 & logFC.gtmyc234.trtL<0) 
+# plot
+p.myc234.49h.rCol.rH.up_down.PIFcomplex<-plot.data.up_down %>% inner_join(tibble(gene_id=PIFcomplex),by="gene_id") %>%  dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description,-gene_id,-name) %>%  gather(sample,value,-1) %>%
+  separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=fct_relevel(treatment,"H"),y=value,color=genotype,shape=rep)) + geom_jitter() + facet_wrap(AGI_desc~.,scale="free",ncol=5,labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="up_down \n(logFC.gtmyc234>0 & logFC.gtmyc234.trtL<0) \n& PIFcomplex")
+p.myc234.49h.rCol.rH.up_down.PIFcomplex
+ggsave(p.myc234.49h.rCol.rH.up_down.PIFcomplex,file=file.path("..","output","doubleCoef","p.myc234.49h.rCol.rH.up_down.PIFcomplex.png"),height=3,width=5)
 ```
 
 
