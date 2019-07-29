@@ -9,7 +9,8 @@
 * Arabidopsis thaliana gene annotationta
 
 ## explanation of DEG file names
-Please find DEG files under DEGs_with_descritipn folder (KN; where the description has been added in the script?)
+Please find DEG files under DEGs_with_descritipn folder (KN; where the description has been added in the script?).
+Or should I use DEGs files under "figure_and_tables"? If so, we need to replace "DEGs_with_description" into "figure_and_tables" in all scripts used.
 
 RNAseq data was splitted by time points (1h or 49h).
 
