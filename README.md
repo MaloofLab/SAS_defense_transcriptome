@@ -30,11 +30,15 @@ RNAseq data was splitted by time points (1h or 49h).
 ## GO term over-representation analysis (GOseq_analysis_CL.Rmd)
 * Arabidopsis thaliana GOslim 
 
+## GO term heatmap (GOseq_heatmap2.Rmd)
+
 ## gene clustering (DE_genes_heatmap_scale_center_f.Rmd)
 
 ## Schweizer (2013) myc234 transcriptome data reanalized (2013_data_reanalized.Rmd)
 
 ## Detailed analysis of PIFtargets and myc234 misregulated genes (MYC234_PIF4target.Rmd, .md, .html, MYC234_PIF4target_files) (by Kazu)
+
+## Differentially expressed genes overlap between different conditions (101218differentially expressed genes.Rmd)
 
 ## All output files are stoerd in output folder not included in this repository.
   |-input
