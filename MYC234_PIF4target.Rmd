@@ -266,7 +266,10 @@ p.down
 ```
 
 # expression pattern of overlapped genes between PIFtargets
-# DEgenes.myc234.1h.rCol.rH
+
+
+
+# DEgenes.myc234.1h.rCol.rH PIFcomplex
 ```{r}
 cpm.wide.1h <- cpm.wide %>% select(c(gene_id,matches("1h")))
 plot.data.down_down<-DEG.list[["DEgenes.myc234.1h.rCol.rH"]] %>% left_join(cpm.wide.1h,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  %>% filter(logFC.gtmyc234<0 & logFC.gtmyc234.trtL<0) 
@@ -285,6 +288,35 @@ ggplot(dsub, aes(x = cut, y = carat, fill = clarity)) +
   geom_point(pch = 21, position = position_jitterdodge())
 
 ```
+
+
+# DEgenes.myc234.49h.rCol.rH all PIFup
+```{r}
+cpm.wide.49h <- cpm.wide %>% select(c(gene_id,matches("49h")))
+plot.data.all<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide.1h,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  
+# plot: use labeller = label_wrap_gen(width=10) for multiple line in each gene name
+# p.myc234.49h.rCol.rH.all.PIFup
+p.myc234.49h.rCol.rH.all.PIFup<-plot.data.all %>% inner_join(tibble(gene_id=PIFup),by="gene_id") %>%  dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description,-gene_id,-name) %>%  gather(sample,value,-1) %>%
+  separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=genotype,y=value,fill=treatment,color=treatment)) + stat_summary(fun.y="mean",geom="bar",alpha=0.2,position="dodge") +
+  geom_point(position = position_jitterdodge(jitter.width=0.2)) + facet_grid(AGI_desc~.,scale="free",labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="49h all & PIFup")
+p.myc234.49h.rCol.rH.all.PIFup
+ggsave(p.myc234.49h.rCol.rH.all.PIFup,file=file.path("..","output","doubleCoef","p.myc234.49h.rCol.rH.all.PIFup.png"),height=8,width=5)
+```
+
+```{r}
+cpm.wide.49h <- cpm.wide %>% select(c(gene_id,matches("49h")))
+plot.data.all<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide.1h,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  
+
+# p.myc234.49h.rCol.rH.all.PIFdown
+p.myc234.49h.rCol.rH.all.PIFdown<-plot.data.all %>% inner_join(tibble(gene_id=PIFdown),by="gene_id") %>%  dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description,-gene_id,-name) %>%  gather(sample,value,-1) %>%
+  separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=genotype,y=value,fill=treatment,color=treatment)) + stat_summary(fun.y="mean",geom="bar",alpha=0.2,position="dodge") +
+  geom_point(position = position_jitterdodge(jitter.width=0.2)) + facet_grid(AGI_desc~.,scale="free",labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="49h all & PIFdown")
+p.myc234.49h.rCol.rH.all.PIFdown
+ggsave(p.myc234.49h.rCol.rH.all.PIFdown,file=file.path("..","output","doubleCoef","p.myc234.49h.rCol.rH.all.PIFdown.png"),height=4,width=5)
+
+```
+
+
 # DEgenes.myc234.49h.rCol.rH down_down & PIFup
 ```{r}
 # use only 49h data
