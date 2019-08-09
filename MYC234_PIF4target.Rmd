@@ -8,6 +8,9 @@ output:
 editor_options: 
   chunk_output_type: console
 ---
+# To do
+* sort genes according to FDR in expression pattern graph below (073119).
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,error=TRUE)
@@ -266,9 +269,6 @@ p.down
 ```
 
 # expression pattern of overlapped genes between PIFtargets
-
-
-
 # DEgenes.myc234.1h.rCol.rH PIFcomplex
 ```{r}
 cpm.wide.1h <- cpm.wide %>% select(c(gene_id,matches("1h")))
@@ -277,7 +277,7 @@ plot.data.down_down<-DEG.list[["DEgenes.myc234.1h.rCol.rH"]] %>% left_join(cpm.w
 # p.myc234.49h.rCol.rH.down_down.PIFup
 p.myc234.1h.rCol.rH.down_down.PIFcomplex<-plot.data.down_down %>% inner_join(tibble(gene_id=PIFcomplex),by="gene_id") %>%  dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description,-gene_id,-name) %>%  gather(sample,value,-1) %>%
   separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=genotype,y=value,fill=treatment,color=treatment)) + stat_summary(fun.y="mean",geom="bar",alpha=0.2,position="dodge") +
-  geom_point(position = position_jitterdodge(jitter.width=0.2)) + facet_grid(AGI_desc~.,scale="free",labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="1h down_down \n(logFC.gtmyc234<0 & logFC.gtmyc234.trtL<0) \n& PIFcomplex")
+  geom_point(position = position_jitterdodge(jitter.width=0.2)) + facet_grid(AGI_desc~.,scale="free",labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6,angle=90)) + labs(title="1h down_down \n(logFC.gtmyc234<0 & logFC.gtmyc234.trtL<0) \n& PIFcomplex")
 p.myc234.1h.rCol.rH.down_down.PIFcomplex
 ggsave(p.myc234.1h.rCol.rH.down_down.PIFcomplex,file=file.path("..","output","doubleCoef","p.myc234.1h.rCol.rH.down_down.PIFcomplex.png"),height=3,width=5)
 
@@ -289,32 +289,41 @@ ggplot(dsub, aes(x = cut, y = carat, fill = clarity)) +
 
 ```
 
-
+#############
 # DEgenes.myc234.49h.rCol.rH all PIFup
 ```{r}
 cpm.wide.49h <- cpm.wide %>% select(c(gene_id,matches("49h")))
-plot.data.all<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide.1h,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  
+plot.data.all<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide.49h,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  
 # plot: use labeller = label_wrap_gen(width=10) for multiple line in each gene name
 # p.myc234.49h.rCol.rH.all.PIFup
 p.myc234.49h.rCol.rH.all.PIFup<-plot.data.all %>% inner_join(tibble(gene_id=PIFup),by="gene_id") %>%  dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description,-gene_id,-name) %>%  gather(sample,value,-1) %>%
   separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=genotype,y=value,fill=treatment,color=treatment)) + stat_summary(fun.y="mean",geom="bar",alpha=0.2,position="dodge") +
-  geom_point(position = position_jitterdodge(jitter.width=0.2)) + facet_grid(AGI_desc~.,scale="free",labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="49h all & PIFup")
+  geom_point(position = position_jitterdodge(jitter.width=0.2)) + facet_grid(AGI_desc~.,scale="free",labeller = label_wrap_gen(width=10))+theme(strip.text.y = element_text(size=6,angle=0),legend.position = "none",axis.title = element_blank())#+ labs(title="49h all & PIFup")
 p.myc234.49h.rCol.rH.all.PIFup
-ggsave(p.myc234.49h.rCol.rH.all.PIFup,file=file.path("..","output","doubleCoef","p.myc234.49h.rCol.rH.all.PIFup.png"),height=8,width=5)
+ggsave(p.myc234.49h.rCol.rH.all.PIFup,file=file.path("..","output","doubleCoef","p.myc234.49h.rCol.rH.all.PIFup.v2.png"),height=8,width=5)
 ```
 
+# all PIFdown
 ```{r}
 cpm.wide.49h <- cpm.wide %>% select(c(gene_id,matches("49h")))
-plot.data.all<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide.1h,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  
+plot.data.all<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide.49h,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  
 
 # p.myc234.49h.rCol.rH.all.PIFdown
 p.myc234.49h.rCol.rH.all.PIFdown<-plot.data.all %>% inner_join(tibble(gene_id=PIFdown),by="gene_id") %>%  dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description,-gene_id,-name) %>%  gather(sample,value,-1) %>%
   separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=genotype,y=value,fill=treatment,color=treatment)) + stat_summary(fun.y="mean",geom="bar",alpha=0.2,position="dodge") +
-  geom_point(position = position_jitterdodge(jitter.width=0.2)) + facet_grid(AGI_desc~.,scale="free",labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="49h all & PIFdown")
+  geom_point(position = position_jitterdodge(jitter.width=0.2)) + facet_grid(AGI_desc~.,scale="free",labeller = label_wrap_gen(width=10))+theme(strip.text.y = element_text(size=6,angle=0),legend.position = "none",axis.title = element_blank()) #+ labs(title="49h all & PIFdown")
 p.myc234.49h.rCol.rH.all.PIFdown
-ggsave(p.myc234.49h.rCol.rH.all.PIFdown,file=file.path("..","output","doubleCoef","p.myc234.49h.rCol.rH.all.PIFdown.png"),height=4,width=5)
+ggsave(p.myc234.49h.rCol.rH.all.PIFdown,file=file.path("..","output","doubleCoef","p.myc234.49h.rCol.rH.all.PIFdown.v2.png"),height=4,width=5)
 
 ```
+
+# combine all PIFup and PIFdown for Fig S1
+```{r}
+FigS1B<-cowplot::plot_grid(p.myc234.49h.rCol.rH.all.PIFdown,ggplot() + theme_void(),ncol=1,rel_heights = c(1,0.935))
+FigS1<-cowplot::plot_grid(ggplot() + theme_void(),ggplot() + theme_void(), p.myc234.49h.rCol.rH.all.PIFup,FigS1B,ncol=2,rel_heights=c(0.1,2),labels=c("A","B"),label_size=8,label_x=0,label_y=0,hjust=-0.5,vjust=-0.5)
+cowplot::save_plot(file.path("..","output","figures_and_tables","FigS1_myc234.49h.PIFup_PIFdown.v2.pdf"),FigS1,base_width=8,base_height = 7)
+```
+
 
 
 # DEgenes.myc234.49h.rCol.rH down_down & PIFup

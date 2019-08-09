@@ -17,7 +17,7 @@ library(tidyverse)
 ```
 
 ```
-## ── Attaching packages ───────────────────────────────────────────────────────────────── tidyverse 1.2.1 ──
+## ── Attaching packages ───────────────────────────────────────────────────── tidyverse 1.2.1 ──
 ```
 
 ```
@@ -56,7 +56,7 @@ library(tidyverse)
 ```
 
 ```
-## ── Conflicts ──────────────────────────────────────────────────────────────────── tidyverse_conflicts() ──
+## ── Conflicts ──────────────────────────────────────────────────────── tidyverse_conflicts() ──
 ## ✖ dplyr::filter() masks stats::filter()
 ## ✖ dplyr::lag()    masks stats::lag()
 ```
@@ -1107,15 +1107,19 @@ p.down
 ![](MYC234_PIF4target_files/figure-html/unnamed-chunk-12-1.png)<!-- -->
 
 # expression pattern of overlapped genes between PIFtargets
-# DEgenes.myc234.1h.rCol.rH
+
+
+
+# DEgenes.myc234.1h.rCol.rH PIFcomplex
 
 ```r
-plot.data.down_down<-DEG.list[["DEgenes.myc234.1h.rCol.rH"]] %>% left_join(cpm.wide,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  %>% filter(logFC.gtmyc234<0 & logFC.gtmyc234.trtL<0) 
-
+cpm.wide.1h <- cpm.wide %>% select(c(gene_id,matches("1h")))
+plot.data.down_down<-DEG.list[["DEgenes.myc234.1h.rCol.rH"]] %>% left_join(cpm.wide.1h,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  %>% filter(logFC.gtmyc234<0 & logFC.gtmyc234.trtL<0) 
 # plot: use labeller = label_wrap_gen(width=10) for multiple line in each gene name
 # p.myc234.49h.rCol.rH.down_down.PIFup
 p.myc234.1h.rCol.rH.down_down.PIFcomplex<-plot.data.down_down %>% inner_join(tibble(gene_id=PIFcomplex),by="gene_id") %>%  dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description,-gene_id,-name) %>%  gather(sample,value,-1) %>%
-  separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=fct_relevel(treatment,"H"),y=value,color=genotype)) + stat_summary(fun.y="mean",geom="bar",alpha=0.5) + geom_jitter(aes(shape=rep)) + facet_wrap(AGI_desc~.,scale="free",ncol=5,labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="1h down_down \n(logFC.gtmyc234<0 & logFC.gtmyc234.trtL<0) \n& PIFcomplex")
+  separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=genotype,y=value,fill=treatment,color=treatment)) + stat_summary(fun.y="mean",geom="bar",alpha=0.2,position="dodge") +
+  geom_point(position = position_jitterdodge(jitter.width=0.2)) + facet_grid(AGI_desc~.,scale="free",labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="1h down_down \n(logFC.gtmyc234<0 & logFC.gtmyc234.trtL<0) \n& PIFcomplex")
 p.myc234.1h.rCol.rH.down_down.PIFcomplex
 ```
 
@@ -1123,35 +1127,91 @@ p.myc234.1h.rCol.rH.down_down.PIFcomplex
 
 ```r
 ggsave(p.myc234.1h.rCol.rH.down_down.PIFcomplex,file=file.path("..","output","doubleCoef","p.myc234.1h.rCol.rH.down_down.PIFcomplex.png"),height=3,width=5)
+
+# example
+dsub <- diamonds[ sample(nrow(diamonds), 1000), ]
+ggplot(dsub, aes(x = cut, y = carat, fill = clarity)) +
+  #geom_boxplot(outlier.size = 0) +
+  geom_point(pch = 21, position = position_jitterdodge())
 ```
-# DEgenes.myc234.49h.rCol.rH down_down & PIFup
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-13-2.png)<!-- -->
+
+
+# DEgenes.myc234.49h.rCol.rH all PIFup
 
 ```r
-plot.data.down_down<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  %>% filter(logFC.gtmyc234<0 & logFC.gtmyc234.trtL<0) 
+cpm.wide.49h <- cpm.wide %>% select(c(gene_id,matches("49h")))
+plot.data.all<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide.1h,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  
 # plot: use labeller = label_wrap_gen(width=10) for multiple line in each gene name
-# p.myc234.49h.rCol.rH.down_down.PIFup
-p.myc234.49h.rCol.rH.down_down.PIFup<-plot.data.down_down %>% inner_join(tibble(gene_id=PIFup),by="gene_id") %>%  dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description,-gene_id,-name) %>%  gather(sample,value,-1) %>%
-  separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=fct_relevel(treatment,"H"),y=value,color=genotype)) + stat_summary(fun.y="mean",geom="bar",alpha=0.5) + geom_jitter(aes(shape=rep)) + facet_wrap(AGI_desc~.,scale="free",ncol=5,labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="down_down \n(logFC.gtmyc234<0 & logFC.gtmyc234.trtL<0) \n& PIFup")
-p.myc234.49h.rCol.rH.down_down.PIFup
+# p.myc234.49h.rCol.rH.all.PIFup
+p.myc234.49h.rCol.rH.all.PIFup<-plot.data.all %>% inner_join(tibble(gene_id=PIFup),by="gene_id") %>%  dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description,-gene_id,-name) %>%  gather(sample,value,-1) %>%
+  separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=genotype,y=value,fill=treatment,color=treatment)) + stat_summary(fun.y="mean",geom="bar",alpha=0.2,position="dodge") +
+  geom_point(position = position_jitterdodge(jitter.width=0.2)) + facet_grid(AGI_desc~.,scale="free",labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="49h all & PIFup")
+p.myc234.49h.rCol.rH.all.PIFup
 ```
 
 ![](MYC234_PIF4target_files/figure-html/unnamed-chunk-14-1.png)<!-- -->
 
 ```r
-ggsave(p.myc234.49h.rCol.rH.down_down.PIFup,file=file.path("..","output","doubleCoef","p.myc234.49h.rCol.rH.down_down.PIFup.png"),height=3,width=8)
+ggsave(p.myc234.49h.rCol.rH.all.PIFup,file=file.path("..","output","doubleCoef","p.myc234.49h.rCol.rH.all.PIFup.png"),height=8,width=5)
+```
+
+
+```r
+cpm.wide.49h <- cpm.wide %>% select(c(gene_id,matches("49h")))
+plot.data.all<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide.1h,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  
+
+# p.myc234.49h.rCol.rH.all.PIFdown
+p.myc234.49h.rCol.rH.all.PIFdown<-plot.data.all %>% inner_join(tibble(gene_id=PIFdown),by="gene_id") %>%  dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description,-gene_id,-name) %>%  gather(sample,value,-1) %>%
+  separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=genotype,y=value,fill=treatment,color=treatment)) + stat_summary(fun.y="mean",geom="bar",alpha=0.2,position="dodge") +
+  geom_point(position = position_jitterdodge(jitter.width=0.2)) + facet_grid(AGI_desc~.,scale="free",labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="49h all & PIFdown")
+p.myc234.49h.rCol.rH.all.PIFdown
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-15-1.png)<!-- -->
+
+```r
+ggsave(p.myc234.49h.rCol.rH.all.PIFdown,file=file.path("..","output","doubleCoef","p.myc234.49h.rCol.rH.all.PIFdown.png"),height=4,width=5)
+```
+
+
+# DEgenes.myc234.49h.rCol.rH down_down & PIFup
+
+```r
+# use only 49h data
+cpm.wide.49h <- cpm.wide %>% select(c(gene_id,matches("49h")))
+# only for FYI genes
+plot.data.down_down<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide.49h,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  %>% filter(logFC.gtmyc234<0 & logFC.gtmyc234.trtL<0) 
+# plot: use labeller = label_wrap_gen(width=10) for multiple line in each gene name
+# p.myc234.49h.rCol.rH.down_down.PIFup
+p.myc234.49h.rCol.rH.down_down.PIFup<-plot.data.down_down %>% inner_join(tibble(gene_id=PIFup),by="gene_id") %>%  dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description,-gene_id,-name) %>%  gather(sample,value,-1) %>%
+  separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=genotype,y=value,fill=treatment,color=treatment)) + stat_summary(fun.y="mean",geom="bar",alpha=0.2,position="dodge") +
+  geom_point(position = position_jitterdodge(jitter.width=0.2)) + facet_grid(AGI_desc~.,scale="free",labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="49h down_down \n(logFC.gtmyc234<0 & logFC.gtmyc234.trtL<0) \n& PIFup")
+p.myc234.49h.rCol.rH.down_down.PIFup
+```
+
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-16-1.png)<!-- -->
+
+```r
+ggsave(p.myc234.49h.rCol.rH.down_down.PIFup,file=file.path("..","output","doubleCoef","p.myc234.49h.rCol.rH.down_down.PIFup.png"),height=6,width=8)
 ```
 # p.myc234.49h.rCol.rH.up_down.PIFcomplex
 
 ```r
+# use only 49h data
+cpm.wide.49h <- cpm.wide %>% select(c(gene_id,matches("49h")))
+
 # up_down
-plot.data.up_down<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  %>% filter(logFC.gtmyc234>0 & logFC.gtmyc234.trtL<0) 
+plot.data.up_down<-DEG.list[["DEgenes.myc234.49h.rCol.rH"]] %>% left_join(cpm.wide.49h,by="gene_id") %>% unite(AGI_desc,c("gene_id","name"),remove=FALSE) %>% dplyr::select(-LR,-PValue,-X1,-logCPM)  %>% filter(logFC.gtmyc234>0 & logFC.gtmyc234.trtL<0) 
 # plot
 p.myc234.49h.rCol.rH.up_down.PIFcomplex<-plot.data.up_down %>% inner_join(tibble(gene_id=PIFcomplex),by="gene_id") %>%  dplyr::select(-logFC.gtmyc234,-logFC.gtmyc234.trtL,-FDR,-description,-gene_id,-name) %>%  gather(sample,value,-1) %>%
-  separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=fct_relevel(treatment,"H"),y=value,color=genotype)) + stat_summary(fun.y="mean",geom="bar",alpha=0.5) + geom_jitter(aes(shape=rep)) + facet_wrap(AGI_desc~.,scale="free",ncol=5,labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="up_down \n(logFC.gtmyc234>0 & logFC.gtmyc234.trtL<0) \n& PIFcomplex")
+  separate(sample, into = c("genotype", "time_point", "treatment", "rep"), sep = "_") %>% ggplot(aes(x=genotype,y=value,fill=treatment,color=treatment)) + stat_summary(fun.y="mean",geom="bar",alpha=0.2,position="dodge") +
+  geom_point(position = position_jitterdodge(jitter.width=0.2)) + facet_grid(AGI_desc~.,scale="free",labeller = label_wrap_gen(width=30))+theme(strip.text = element_text(size=6)) + labs(title="49h up_down \n(logFC.gtmyc234>0 & logFC.gtmyc234.trtL<0) \n& PIFcomplex")
 p.myc234.49h.rCol.rH.up_down.PIFcomplex
 ```
 
-![](MYC234_PIF4target_files/figure-html/unnamed-chunk-15-1.png)<!-- -->
+![](MYC234_PIF4target_files/figure-html/unnamed-chunk-17-1.png)<!-- -->
 
 ```r
 ggsave(p.myc234.49h.rCol.rH.up_down.PIFcomplex,file=file.path("..","output","doubleCoef","p.myc234.49h.rCol.rH.up_down.PIFcomplex.png"),height=3,width=5)
@@ -1223,13 +1283,14 @@ sessionInfo()
 ## [65] haven_2.1.0                 GenomicFeatures_1.32.3     
 ## [67] hms_0.4.2                   locfit_1.5-9.1             
 ## [69] knitr_1.22                  pillar_1.3.1               
-## [71] GenomicRanges_1.32.7        biomaRt_2.36.1             
-## [73] stats4_3.5.1                XML_3.98-1.19              
-## [75] glue_1.3.1                  evaluate_0.13              
-## [77] data.table_1.12.0           modelr_0.1.4               
-## [79] cellranger_1.1.0            gtable_0.3.0               
-## [81] assertthat_0.2.1            xfun_0.5                   
-## [83] broom_0.5.1                 viridisLite_0.3.0          
-## [85] GenomicAlignments_1.16.0    AnnotationDbi_1.42.1       
-## [87] memoise_1.1.0               IRanges_2.14.12
+## [71] GenomicRanges_1.32.7        reshape2_1.4.3             
+## [73] biomaRt_2.36.1              stats4_3.5.1               
+## [75] XML_3.98-1.19               glue_1.3.1                 
+## [77] evaluate_0.13               data.table_1.12.0          
+## [79] modelr_0.1.4                cellranger_1.1.0           
+## [81] gtable_0.3.0                assertthat_0.2.1           
+## [83] xfun_0.5                    broom_0.5.1                
+## [85] viridisLite_0.3.0           GenomicAlignments_1.16.0   
+## [87] AnnotationDbi_1.42.1        memoise_1.1.0              
+## [89] IRanges_2.14.12
 ```
